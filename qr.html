@@ -1475,9 +1475,16 @@ var Sync = (function(){
   var tok = load('dbx', null);          // { refresh, access, exp }
   var lastPull = 0, lastPush = 0, timer = null, busy = false, lastErr = '';
   var pushQueued = false;
+  setInterval(function(){ if(busy && Date.now() - busySince > 20000){ busy = false; $('syncNow').disabled = false; } }, 5000);
+  var busySince = 0;
 
   function enabled(){ return !!(tok && tok.refresh); }
   function hhmm(t){ var d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  function hhmmss(t){ var d = new Date(t); return hhmm(t) + ':' + pad2(d.getSeconds()); }
+  function note(text, good){
+    var m = $('syncMsg');
+    m.textContent = text; m.className = 'msg ' + (good ? 'good' : 'bad');
+  }
 
   function setStatus(text, bad){
     var b = $('btnSync');
@@ -1491,8 +1498,9 @@ var Sync = (function(){
   function statusText(){
     if(!enabled()) return '未接続。「Dropboxにログイン」を押してください。';
     var s = '接続済み（同じアカウントでログインした他のパソコンと共有中）\n';
-    s += '最後に読み込んだ時刻：' + (lastPull ? hhmm(lastPull) : 'まだ') + '\n';
-    s += '最後に書き込んだ時刻：' + (lastPush ? hhmm(lastPush) : 'まだ');
+    s += '最後に読み込んだ時刻：' + (lastPull ? hhmmss(lastPull) : 'まだ') + '\n';
+    s += '最後に書き込んだ時刻：' + (lastPush ? hhmmss(lastPush) : 'まだ') + '\n';
+    s += '一覧：' + patients.length + '名';
     if(lastErr) s += '\n直近のエラー：' + lastErr;
     return s;
   }
@@ -1596,23 +1604,34 @@ var Sync = (function(){
     renderBar(); renderList(); renderStage();
   }
 
-  function pull(){
-    if(!enabled() || busy) return Promise.resolve();
-    busy = true;
+  function pull(manual){
+    if(!enabled()) return Promise.resolve();
+    if(busy){ if(manual) note('同期処理中です。少し待ってからもう一度押してください。', false); return Promise.resolve(); }
+    busy = true; busySince = Date.now();
+    if(manual){ note('同期中…', true); $('syncNow').disabled = true; }
+    var result = '';
     return download().then(function(box){
       lastPull = Date.now(); lastErr = '';
       if(box && (box.updated || 0) > dayUpdated){
         applyRemote(box);                                     // 他のPCの方が新しい
+        result = 'Dropboxから最新の一覧（' + patients.length + '名）を読み込みました。';
       } else if(patients.length && dayUpdated > (box ? (box.updated || 0) : 0)){
         pushQueued = true;                                    // こちらの方が新しい → 後で書き込む
+        result = 'このパソコンの一覧の方が新しいので、Dropboxに書き込みます。';
+      } else {
+        result = box ? '確認しました。すでに最新です（' + patients.length + '名）。' : 'Dropboxにはまだ一覧がありません。CSVを読み込むと保存されます。';
       }
-    }).catch(function(e){ lastErr = e.message || String(e); })
-      .then(function(){ busy = false; refreshStatus(); if(pushQueued){ pushQueued = false; push(); } });
+    }).catch(function(e){ lastErr = e.message || String(e); result = '同期に失敗しました：' + lastErr; })
+      .then(function(){
+        busy = false; $('syncNow').disabled = false; refreshStatus();
+        if(manual) note(result, !lastErr);
+        if(pushQueued){ pushQueued = false; push(); }
+      });
   }
   function push(){
     if(!enabled()) return;
     if(busy){ pushQueued = true; return; }
-    busy = true;
+    busy = true; busySince = Date.now();
     upload(snapshot()).then(function(){ lastPush = Date.now(); lastErr = ''; })
       .catch(function(e){ lastErr = e.message || String(e); })
       .then(function(){ busy = false; refreshStatus(); if(pushQueued){ pushQueued = false; push(); } });
@@ -1631,7 +1650,7 @@ var Sync = (function(){
       history.replaceState(null, '', location.pathname);
       done = finishLogin(decodeURIComponent(m[1])).catch(function(e){
         lastErr = 'ログインに失敗しました：' + (e.message || e);
-        $('syncMsg').textContent = lastErr; $('syncMsg').classList.remove('hide');
+        note(lastErr, false);
         $('syncSheet').classList.remove('hide');
       });
     } else if(/[?&]error=/.test(location.search)){
@@ -1645,11 +1664,11 @@ var Sync = (function(){
   }
 
   $('btnSync').addEventListener('click', function(){
-    $('syncMsg').classList.add('hide'); refreshStatus(); $('syncSheet').classList.remove('hide');
+    $('syncMsg').className = 'msg bad hide'; refreshStatus(); $('syncSheet').classList.remove('hide');
   });
   $('syncClose').addEventListener('click', function(){ $('syncSheet').classList.add('hide'); });
   $('syncLogin').addEventListener('click', login);
-  $('syncNow').addEventListener('click', function(){ pull(); });
+  $('syncNow').addEventListener('click', function(){ pull(true); });
   $('syncLogout').addEventListener('click', function(){
     if(!window.confirm('このパソコンのDropbox連携を解除します。Dropbox上のデータは消えません。よろしいですか。')) return;
     logout();
