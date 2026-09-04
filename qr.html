@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>患者QR画面表示</title>
+<style>
+  :root{
+    --shell:#EDF2F5;
+    --panel:#FFFFFF;
+    --raise:#E1E9EF;
+    --line:#D3DCE3;
+    --text:#1D2A33;
+    --dim:#455B6B;
+    --blue:#1D74B4;
+    --warn:#A8433D;
+    --ok:#2C7A57;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --ja:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",YuGothic,Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--shell);color:var(--text);
+    font-family:var(--ja);font-size:15px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit}
+
+  /* ---------- shell ---------- */
+  .app{display:flex;flex-direction:column;height:100%}
+  .bar{
+    display:flex;align-items:center;gap:16px;
+    padding:10px 20px;border-bottom:1px solid var(--line);
+    background:var(--panel);flex:0 0 auto;
+  }
+  .bar h1{margin:0;font-size:15px;font-weight:600;letter-spacing:.02em}
+  .bar .day{color:var(--text);font-size:13.5px;font-weight:500}
+  .bar .spacer{flex:1}
+  .linkish{
+    background:none;border:0;padding:6px 10px;border-radius:6px;
+    color:var(--dim);cursor:pointer;font-size:13.5px;
+  }
+  .linkish:hover{color:var(--text);background:var(--raise)}
+  .linkish:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+  .body{display:flex;flex:1;min-height:0}
+
+  /* ---------- list ---------- */
+  .list{
+    width:340px;flex:0 0 auto;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;background:var(--panel);min-height:0;
+  }
+  .find{padding:12px;border-bottom:1px solid var(--line)}
+  .find input{
+    width:100%;padding:10px 12px;border-radius:8px;
+    border:1px solid var(--line);background:#fff;color:var(--text);
+    font-family:var(--ja);font-size:15px;
+  }
+  .find input:focus{outline:none;border-color:var(--blue)}
+  .rows{overflow:auto;flex:1;min-height:0}
+  .row{
+    display:block;width:100%;text-align:left;cursor:pointer;
+    padding:9px 14px;border:0;border-bottom:1px solid var(--line);
+    background:none;
+  }
+  .row:hover{background:var(--raise)}
+  .row:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+  .row.on{background:#DCEAF5;box-shadow:inset 3px 0 0 var(--blue)}
+  .row .id{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--blue);letter-spacing:.04em}
+  .row .nm{font-size:15px}
+  .row .rj{font-family:var(--mono);font-size:13px;color:var(--dim);letter-spacing:.02em}
+  .count{padding:9px 14px;color:var(--dim);font-size:13px;border-top:1px solid var(--line)}
+  .row.off .nm{color:var(--dim)}
+  .row.off .id{color:var(--warn)}
+  .tally{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:14.5px;margin-bottom:18px}
+  .tally .k{color:var(--dim)}
+  .tally .v{font-family:var(--mono);text-align:right}
+  .tally .hit{color:var(--warn)}
+  .repblock{margin-top:6px}
+  .repblock h3{margin:0 0 6px;font-size:14.5px;font-weight:600}
+
+  /* ---------- stage ---------- */
+  .stage{
+    flex:1;min-width:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:24px;overflow:auto;
+  }
+  .card{
+    background:#fff;border-radius:10px;padding:18px;line-height:0;
+    border:1px solid var(--line);box-shadow:0 10px 26px rgba(29,42,51,.12);
+  }
+  .card svg{display:block;width:var(--qr,340px);height:var(--qr,340px)}
+  .who{margin-top:22px;text-align:center;max-width:640px}
+  .who .kanji{font-size:30px;font-weight:600;letter-spacing:.02em}
+  .who .meta{
+    margin-top:8px;font-family:var(--mono);font-size:19px;color:var(--text);
+    letter-spacing:.06em;word-break:break-all;
+  }
+  .who .dob{margin-top:4px;font-family:var(--mono);font-size:17px;color:var(--dim);letter-spacing:.1em}
+  .who .raw{
+    margin-top:14px;font-family:var(--mono);font-size:14px;color:var(--text);
+    letter-spacing:.02em;word-break:break-all;
+  }
+  .sizes{margin-top:18px;display:flex;gap:8px}
+  .sizes button{
+    background:var(--panel);border:1px solid var(--line);border-radius:7px;
+    padding:7px 15px;cursor:pointer;font-size:13.5px;color:var(--dim);
+  }
+  .sizes button.on{border-color:var(--blue);color:var(--text)}
+  .sizes button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+  /* ---------- drop / empty ---------- */
+  .drop{
+    width:min(620px,100%);border:1px dashed var(--line);border-radius:14px;
+    padding:56px 32px;text-align:center;background:var(--panel);
+  }
+  .drop.hot{border-color:var(--blue);background:var(--raise)}
+  .drop h2{margin:0 0 22px;font-size:22px;font-weight:600}
+  .drop h2:not(:last-child) + p{margin-top:-12px}
+  .drop p{margin:0 0 22px;color:var(--dim);font-size:14.5px}
+  .btn{
+    background:var(--blue);border:0;border-radius:8px;color:#fff;
+    padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer;
+  }
+  .btn:hover{filter:brightness(1.08)}
+  .btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--line);font-weight:400}
+  .btn.ghost:hover{background:var(--raise);filter:none}
+  .note{margin-top:20px;color:var(--dim);font-size:13.5px;line-height:1.75}
+
+  /* ---------- panels ---------- */
+  .sheet{
+    position:fixed;inset:0;background:rgba(23,35,44,.34);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:40px 20px;overflow:auto;z-index:20;
+  }
+  .sheet .inner{
+    width:min(680px,100%);background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:24px 26px;box-shadow:0 16px 40px rgba(23,35,44,.18);
+  }
+  .sheet h2{margin:0 0 4px;font-size:18px}
+  .sheet .sub{margin:0 0 20px;color:var(--dim);font-size:14px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13.5px;font-weight:500;color:var(--dim);margin-bottom:5px}
+  .field select,.field input[type=text]{
+    width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--line);
+    background:var(--shell);color:var(--text);font-family:var(--ja);font-size:14px;
+  }
+  .field input[type=text].mono{font-family:var(--mono)}
+  .field select:focus,.field input:focus{outline:none;border-color:var(--blue)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .checks label{display:flex;gap:9px;align-items:flex-start;margin-bottom:10px;font-size:14px;color:var(--text)}
+  .checks span{color:var(--dim);font-size:13.5px;display:block;line-height:1.6}
+  .actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+  .msg{margin-top:14px;font-size:14px;padding:10px 13px;border-radius:7px}
+  .msg.bad{background:#FBE9E8;color:#8E332E}
+  .msg.good{background:#E4F2EC;color:#215C42}
+  .sample{
+    font-family:var(--mono);font-size:13.5px;line-height:1.75;color:var(--text);
+    background:var(--shell);border:1px solid var(--line);border-radius:7px;
+    padding:9px 11px;overflow:auto;white-space:pre;margin-top:6px;
+  }
+  .hide{display:none !important}
+
+  @media (max-width:820px){
+    .body{flex-direction:column}
+    .list{width:auto;border-right:0;border-bottom:1px solid var(--line);max-height:44vh}
+    .card svg{width:min(var(--qr,340px),74vw);height:min(var(--qr,340px),74vw)}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .card{transition:opacity .12s ease}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="bar">
+    <h1>患者QR画面表示</h1>
+    <span class="day" id="dayInfo"></span>
+    <span class="spacer"></span>
+    <button class="linkish hide" id="btnReport">読み込み結果</button>
+    <button class="linkish hide" id="btnClear">一覧を消す</button>
+    <button class="linkish" id="btnCsv">CSVを入れ替える</button>
+    <button class="linkish" id="btnManual">手入力で出す</button>
+    <button class="linkish" id="btnScan">読み取りテスト</button>
+    <button class="linkish" id="btnCols">列の設定</button>
+    <button class="linkish" id="btnSet">設定</button>
+  </div>
+
+  <div class="body">
+    <div class="list" id="listPane">
+      <div class="find">
+        <input id="q" type="text" placeholder="カルテ番号・氏名・カナで絞り込む" autocomplete="off">
+      </div>
+      <div class="rows" id="rows"></div>
+      <div class="count" id="count"></div>
+    </div>
+
+    <div class="stage" id="stage"></div>
+  </div>
+</div>
+
+<input type="file" id="file" accept=".csv,.tsv,.txt" class="hide">
+
+<!-- column mapping -->
+<div class="sheet hide" id="mapSheet"><div class="inner">
+  <h2>CSVの列を合わせる</h2>
+  <p class="sub">1行目の見出しから自動で選びました。違っていれば直してください。次回からは記憶します。</p>
+  <div class="field"><label>カルテ番号</label><select id="mId"></select></div>
+  <div class="grid2">
+    <div class="field"><label>姓（漢字）</label><select id="mLast"></select></div>
+    <div class="field"><label>名（漢字）</label><select id="mFirst"></select></div>
+  </div>
+  <div class="field"><label>氏名がひとつの列にまとまっている場合</label><select id="mFull"></select></div>
+  <div class="grid2">
+    <div class="field"><label>カナ（姓名まとめて可）</label><select id="mKana"></select></div>
+    <div class="field"><label>生年月日</label><select id="mDob"></select></div>
+  </div>
+  <div class="field"><label>ローマ字の列があれば（なくて構いません）</label><select id="mRomaji"></select></div>
+  <div class="sample" id="mapPreview"></div>
+  <div class="actions">
+    <button class="btn" id="mapOk">この設定で読み込む</button>
+    <button class="btn ghost" id="mapCancel">やめる</button>
+  </div>
+  <div class="msg bad hide" id="mapMsg"></div>
+</div></div>
+
+<!-- manual -->
+<div class="sheet hide" id="manSheet"><div class="inner">
+  <h2>手入力で出す</h2>
+  <p class="sub">当日追加の方や、CSVに載っていない方はこちらから。一覧に加わります。</p>
+  <div class="field"><label>カルテ番号</label><input type="text" id="fId" class="mono" autocomplete="off"></div>
+  <div class="grid2">
+    <div class="field"><label>姓（漢字）</label><input type="text" id="fLast" autocomplete="off"></div>
+    <div class="field"><label>名（漢字）</label><input type="text" id="fFirst" autocomplete="off"></div>
+  </div>
+  <div class="field"><label>カナ（例：ヤマダ ハナコ）</label><input type="text" id="fKana" autocomplete="off"></div>
+  <div class="grid2">
+    <div class="field"><label>ローマ字（カナから自動で入ります）</label><input type="text" id="fRomaji" class="mono" autocomplete="off"></div>
+    <div class="field"><label>生年月日</label><input type="text" id="fDob" class="mono" placeholder="1990/01/01" autocomplete="off"></div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="manOk">一覧に加えて表示する</button>
+    <button class="btn ghost" id="manCancel">やめる</button>
+  </div>
+  <div class="msg bad hide" id="manMsg"></div>
+</div></div>
+
+<!-- scan test -->
+<div class="sheet hide" id="scanSheet"><div class="inner">
+  <h2>読み取りテスト</h2>
+  <p class="sub">画面のQRをスキャナで読ませて、下の欄に何が届いているかを確かめます。Volusonへ入れる前の確認用です。</p>
+  <div class="field"><label>ここにカーソルを置いてスキャン</label><input type="text" id="scanIn" class="mono" autocomplete="off"></div>
+  <div class="sample" id="scanOut">まだ何も届いていません。</div>
+  <div class="actions">
+    <button class="btn ghost" id="scanClose">閉じる</button>
+  </div>
+</div></div>
+
+<!-- import report -->
+<div class="sheet hide" id="repSheet"><div class="inner">
+  <h2>読み込み結果</h2>
+  <p class="sub" id="repSub"></p>
+  <div id="repBody"></div>
+  <div class="actions">
+    <button class="btn" id="repClose">閉じる</button>
+  </div>
+</div></div>
+
+<!-- settings -->
+<div class="sheet hide" id="setSheet"><div class="inner">
+  <h2>設定</h2>
+  <p class="sub">クリニックごとに一度決めれば、あとは触りません。</p>
+  <div class="checks">
+    <label><input type="checkbox" id="sLong"> 長音を省く
+      <span>サトウ → Sato。井上のように母音が続く場合は省きません。</span></label>
+    <label><input type="checkbox" id="sUpper"> ローマ字をすべて大文字にする
+      <span>YAMADA HANAKO の形。検体ラベルの体裁に合わせたいとき。</span></label>
+    <label><input type="checkbox" id="sKeep"> 今日の一覧をこのパソコンに残す
+      <span>再読み込みしても消えません。日付が変わると自動で消えます。</span></label>
+  </div>
+  <div class="field"><label>QRの誤り訂正レベル</label>
+    <select id="sLevel">
+      <option value="L">L（最小・読み取り最速）</option>
+      <option value="M">M（標準）</option>
+      <option value="Q">Q（汚れや反射に強い）</option>
+    </select>
+  </div>
+  <div class="sample" id="setPreview"></div>
+  <div class="actions">
+    <button class="btn" id="setClose">閉じる</button>
+    <button class="btn ghost" id="setWipe">保存したデータを全部消す</button>
+  </div>
+  <div class="msg good hide" id="setMsg"></div>
+</div></div>
+
+<script>
+/* Minimal self-contained QR encoder. Byte mode, versions 1-15, levels L/M/Q/H.
+   No dependencies. Returns a boolean matrix. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.QR = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // format-info bit values for each level
+  var FMT = { L: 1, M: 0, Q: 3, H: 2 };
+  var LVL = { L: 0, M: 1, Q: 2, H: 3 };
+
+  // [count, totalCodewords, dataCodewords] triples, order L,M,Q,H per version
+  var RS = [
+    [[1,26,19]], [[1,26,16]], [[1,26,13]], [[1,26,9]],
+    [[1,44,34]], [[1,44,28]], [[1,44,22]], [[1,44,16]],
+    [[1,70,55]], [[1,70,44]], [[2,35,17]], [[2,35,13]],
+    [[1,100,80]], [[2,50,32]], [[2,50,24]], [[4,25,9]],
+    [[1,134,108]], [[2,67,43]], [[2,33,15],[2,34,16]], [[2,33,11],[2,34,12]],
+    [[2,86,68]], [[4,43,27]], [[4,43,19]], [[4,43,15]],
+    [[2,98,78]], [[4,49,31]], [[2,32,14],[4,33,15]], [[4,39,13],[1,40,14]],
+    [[2,121,97]], [[2,60,38],[2,61,39]], [[4,40,18],[2,41,19]], [[4,40,14],[2,41,15]],
+    [[2,146,116]], [[3,58,36],[2,59,37]], [[4,36,16],[4,37,17]], [[4,36,12],[4,37,13]],
+    [[2,86,68],[2,87,69]], [[4,69,43],[1,70,44]], [[6,43,19],[2,44,20]], [[6,43,15],[2,44,16]],
+    [[4,101,81]], [[1,80,50],[4,81,51]], [[4,50,22],[4,51,23]], [[3,36,12],[8,37,13]],
+    [[2,116,92],[2,117,93]], [[6,58,36],[2,59,37]], [[4,46,20],[6,47,21]], [[7,42,14],[4,43,15]],
+    [[4,133,107]], [[8,59,37],[1,60,38]], [[8,44,20],[4,45,21]], [[12,33,11],[4,34,12]],
+    [[3,145,115],[1,146,116]], [[4,64,40],[5,65,41]], [[11,36,16],[5,37,17]], [[11,36,12],[5,37,13]],
+    [[5,109,87],[1,110,88]], [[5,65,41],[5,66,42]], [[5,54,24],[7,55,25]], [[11,36,12],[7,37,13]]
+  ];
+
+  var ALIGN = [
+    [], [6,18], [6,22], [6,26], [6,30], [6,34], [6,22,38], [6,24,42],
+    [6,26,46], [6,28,50], [6,30,54], [6,32,58], [6,34,62], [6,26,46,66], [6,26,48,70]
+  ];
+
+  var REMAINDER = [0,7,7,7,7,7,0,0,0,0,0,0,0,3,3];
+
+  // ---- GF(256) ----
+  var EXP = new Array(512), LOG = new Array(256);
+  (function () {
+    var x = 1;
+    for (var i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11D; }
+    for (var j = 255; j < 512; j++) EXP[j] = EXP[j - 255];
+  }());
+  function gmul(a, b) { return (a === 0 || b === 0) ? 0 : EXP[LOG[a] + LOG[b]]; }
+
+  function genPoly(n) {
+    var poly = [1];
+    for (var i = 0; i < n; i++) {
+      var next = [];
+      for (var k = 0; k <= poly.length; k++) next.push(0);
+      for (var j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= gmul(poly[j], EXP[i]);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  function ecBytes(data, ecLen) {
+    var gen = genPoly(ecLen);
+    var res = data.slice();
+    for (var p = 0; p < ecLen; p++) res.push(0);
+    for (var i = 0; i < data.length; i++) {
+      var f = res[i];
+      if (f === 0) continue;
+      for (var j = 0; j < gen.length; j++) res[i + j] ^= gmul(gen[j], f);
+    }
+    return res.slice(data.length);
+  }
+
+  // ---- text -> utf8 bytes ----
+  function utf8(str) {
+    var out = [];
+    for (var i = 0; i < str.length; i++) {
+      var c = str.codePointAt(i);
+      if (c > 0xFFFF) i++;
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) { out.push(0xC0 | (c >> 6), 0x80 | (c & 63)); }
+      else if (c < 0x10000) { out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)); }
+      else { out.push(0xF0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)); }
+    }
+    return out;
+  }
+
+  function blocksFor(version, level) {
+    return RS[(version - 1) * 4 + LVL[level]];
+  }
+  function dataCapacity(version, level) {
+    var b = blocksFor(version, level), n = 0;
+    for (var i = 0; i < b.length; i++) n += b[i][0] * b[i][2];
+    return n;
+  }
+
+  function pickVersion(byteLen, level, minVersion) {
+    for (var v = minVersion || 1; v <= 15; v++) {
+      var cci = v < 10 ? 8 : 16;
+      var need = Math.ceil((4 + cci + byteLen * 8) / 8);
+      if (need <= dataCapacity(v, level)) return v;
+    }
+    return -1;
+  }
+
+  function buildCodewords(bytes, version, level) {
+    var cci = version < 10 ? 8 : 16;
+    var bits = [];
+    function put(val, len) { for (var i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); }
+    put(4, 4);
+    put(bytes.length, cci);
+    for (var i = 0; i < bytes.length; i++) put(bytes[i], 8);
+
+    var cap = dataCapacity(version, level) * 8;
+    var term = Math.min(4, cap - bits.length);
+    for (var t = 0; t < term; t++) bits.push(0);
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    var data = [];
+    for (var b = 0; b < bits.length; b += 8) {
+      var v = 0;
+      for (var k = 0; k < 8; k++) v = (v << 1) | bits[b + k];
+      data.push(v);
+    }
+    var pad = [0xEC, 0x11], pi = 0;
+    while (data.length < cap / 8) data.push(pad[pi++ % 2]);
+
+    // split into blocks
+    var spec = blocksFor(version, level);
+    var dBlocks = [], eBlocks = [], pos = 0, maxD = 0, maxE = 0;
+    for (var s = 0; s < spec.length; s++) {
+      var cnt = spec[s][0], total = spec[s][1], dcw = spec[s][2];
+      for (var c = 0; c < cnt; c++) {
+        var chunk = data.slice(pos, pos + dcw); pos += dcw;
+        dBlocks.push(chunk);
+        eBlocks.push(ecBytes(chunk, total - dcw));
+        if (dcw > maxD) maxD = dcw;
+        if (total - dcw > maxE) maxE = total - dcw;
+      }
+    }
+    var out = [], m, n2;
+    for (m = 0; m < maxD; m++) for (n2 = 0; n2 < dBlocks.length; n2++) if (m < dBlocks[n2].length) out.push(dBlocks[n2][m]);
+    for (m = 0; m < maxE; m++) for (n2 = 0; n2 < eBlocks.length; n2++) if (m < eBlocks[n2].length) out.push(eBlocks[n2][m]);
+    return out;
+  }
+
+  // ---- matrix ----
+  function newMatrix(size) {
+    var m = [];
+    for (var i = 0; i < size; i++) { var row = []; for (var j = 0; j < size; j++) row.push(null); m.push(row); }
+    return m;
+  }
+
+  function placeFunction(m, version) {
+    var size = m.length, i, j;
+    function finder(r, c) {
+      for (i = -1; i <= 7; i++) for (j = -1; j <= 7; j++) {
+        var rr = r + i, cc = c + j;
+        if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+        var on = (i >= 0 && i <= 6 && (j === 0 || j === 6)) ||
+                 (j >= 0 && j <= 6 && (i === 0 || i === 6)) ||
+                 (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+        m[rr][cc] = on ? 1 : 0;
+      }
+    }
+    finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
+
+    for (i = 8; i < size - 8; i++) { var b = (i % 2 === 0) ? 1 : 0; m[6][i] = b; m[i][6] = b; }
+
+    var ap = ALIGN[version - 1], last = ap.length - 1;
+    for (var a = 0; a < ap.length; a++) for (var b2 = 0; b2 < ap.length; b2++) {
+      // the three centres that sit inside a finder pattern are omitted
+      if ((a === 0 && b2 === 0) || (a === 0 && b2 === last) || (a === last && b2 === 0)) continue;
+      var r0 = ap[a], c0 = ap[b2];
+      for (i = -2; i <= 2; i++) for (j = -2; j <= 2; j++) {
+        var on2 = (Math.abs(i) === 2 || Math.abs(j) === 2 || (i === 0 && j === 0));
+        m[r0 + i][c0 + j] = on2 ? 1 : 0;
+      }
+    }
+
+    m[size - 8][8] = 1; // dark module
+
+    // reserve format areas
+    for (i = 0; i <= 8; i++) { if (m[8][i] === null) m[8][i] = 0; if (m[i][8] === null) m[i][8] = 0; }
+    for (i = size - 8; i < size; i++) { if (m[8][i] === null) m[8][i] = 0; if (m[i][8] === null) m[i][8] = 0; }
+
+    if (version >= 7) {
+      // BCH(18,6) version information
+      var d = version << 12, vi;
+      while (bitLen(d) - 13 >= 0) d ^= 0x1F25 << (bitLen(d) - 13);
+      vi = (version << 12) | d;
+      for (i = 0; i < 18; i++) {
+        var bit = (vi >> i) & 1;
+        m[Math.floor(i / 3)][size - 11 + (i % 3)] = bit;
+        m[size - 11 + (i % 3)][Math.floor(i / 3)] = bit;
+      }
+    }
+  }
+
+  function bitLen(x) { var n = 0; while (x !== 0) { n++; x >>>= 1; } return n; }
+
+  function placeFormat(m, level, mask) {
+    var size = m.length;
+    var data = (FMT[level] << 3) | mask;
+    var d = data << 10;
+    while (bitLen(d) - 11 >= 0) d ^= 0x537 << (bitLen(d) - 11);
+    var fmt = ((data << 10) | d) ^ 0x5412;
+    for (var i = 0; i < 15; i++) {
+      var bit = (fmt >> i) & 1;
+      if (i < 6) m[i][8] = bit;
+      else if (i < 8) m[i + 1][8] = bit;
+      else if (i === 8) m[8][7] = bit;
+      else m[8][14 - i] = bit;
+
+      if (i < 8) m[8][size - 1 - i] = bit;
+      else m[size - 15 + i][8] = bit;
+    }
+    m[size - 8][8] = 1;
+  }
+
+  function placeData(m, codewords) {
+    var size = m.length, dir = -1, row = size - 1, bitIdx = 0;
+    for (var col = size - 1; col > 0; col -= 2) {
+      if (col === 6) col--;
+      while (true) {
+        for (var c = 0; c < 2; c++) {
+          var cc = col - c;
+          if (m[row][cc] === null) {
+            var bit = 0;
+            if (bitIdx >> 3 < codewords.length) bit = (codewords[bitIdx >> 3] >> (7 - (bitIdx & 7))) & 1;
+            m[row][cc] = bit;
+            bitIdx++;
+          }
+        }
+        row += dir;
+        if (row < 0 || row >= size) { row -= dir; dir = -dir; break; }
+      }
+    }
+  }
+
+  function maskFn(mask, i, j) {
+    switch (mask) {
+      case 0: return (i + j) % 2 === 0;
+      case 1: return i % 2 === 0;
+      case 2: return j % 3 === 0;
+      case 3: return (i + j) % 3 === 0;
+      case 4: return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0;
+      case 5: return (i * j) % 2 + (i * j) % 3 === 0;
+      case 6: return ((i * j) % 2 + (i * j) % 3) % 2 === 0;
+      case 7: return ((i + j) % 2 + (i * j) % 3) % 2 === 0;
+    }
+    return false;
+  }
+
+  function penalty(m) {
+    var size = m.length, score = 0, i, j, k;
+    // rule 1
+    for (i = 0; i < size; i++) {
+      for (var pass = 0; pass < 2; pass++) {
+        var run = 1, prev = pass ? m[0][i] : m[i][0];
+        for (j = 1; j < size; j++) {
+          var cur = pass ? m[j][i] : m[i][j];
+          if (cur === prev) run++;
+          else { if (run >= 5) score += run - 2; run = 1; prev = cur; }
+        }
+        if (run >= 5) score += run - 2;
+      }
+    }
+    // rule 2
+    for (i = 0; i < size - 1; i++) for (j = 0; j < size - 1; j++) {
+      var v = m[i][j];
+      if (v === m[i][j + 1] && v === m[i + 1][j] && v === m[i + 1][j + 1]) score += 3;
+    }
+    // rule 3
+    var pat1 = [1,0,1,1,1,0,1,0,0,0,0], pat2 = [0,0,0,0,1,0,1,1,1,0,1];
+    for (i = 0; i < size; i++) for (j = 0; j + 11 <= size; j++) {
+      var ok1 = true, ok2 = true, ok3 = true, ok4 = true;
+      for (k = 0; k < 11; k++) {
+        if (m[i][j + k] !== pat1[k]) ok1 = false;
+        if (m[i][j + k] !== pat2[k]) ok2 = false;
+        if (m[j + k][i] !== pat1[k]) ok3 = false;
+        if (m[j + k][i] !== pat2[k]) ok4 = false;
+      }
+      if (ok1) score += 40; if (ok2) score += 40; if (ok3) score += 40; if (ok4) score += 40;
+    }
+    // rule 4
+    var dark = 0;
+    for (i = 0; i < size; i++) for (j = 0; j < size; j++) if (m[i][j]) dark++;
+    var pct = dark * 100 / (size * size);
+    score += Math.floor(Math.abs(pct - 50) / 5) * 10;
+    return score;
+  }
+
+  function encode(text, opts) {
+    opts = opts || {};
+    var level = opts.level || 'M';
+    var bytes = utf8(text);
+    var version = pickVersion(bytes.length, level, opts.minVersion || 1);
+    if (version < 0) throw new Error('データが長すぎます');
+
+    var codewords = buildCodewords(bytes, version, level);
+    var rem = REMAINDER[version - 1];
+    var size = 17 + version * 4;
+
+    var base = newMatrix(size);
+    placeFunction(base, version);
+    var reserved = [];
+    for (var i = 0; i < size; i++) { var r = []; for (var j = 0; j < size; j++) r.push(base[i][j] !== null); reserved.push(r); }
+
+    // pad remainder bits into the stream implicitly (placeData writes 0 past the end)
+    void rem;
+
+    var best = null, bestScore = Infinity, bestMask = 0;
+    for (var mask = 0; mask < 8; mask++) {
+      var m = [];
+      for (i = 0; i < size; i++) m.push(base[i].slice());
+      placeData(m, codewords);
+      for (i = 0; i < size; i++) for (j = 0; j < size; j++) {
+        if (!reserved[i][j] && maskFn(mask, i, j)) m[i][j] ^= 1;
+      }
+      placeFormat(m, level, mask);
+      var s = penalty(m);
+      if (s < bestScore) { bestScore = s; best = m; bestMask = mask; }
+    }
+    return { size: size, version: version, level: level, mask: bestMask, modules: best };
+  }
+
+  function toSvg(qr, opts) {
+    opts = opts || {};
+    var quiet = opts.quiet == null ? 4 : opts.quiet;
+    var px = opts.scale || 6;
+    var n = qr.size + quiet * 2;
+    var dim = n * px;
+    var path = [];
+    for (var i = 0; i < qr.size; i++) {
+      for (var j = 0; j < qr.size; j++) {
+        if (qr.modules[i][j]) path.push('M' + ((j + quiet) * px) + ' ' + ((i + quiet) * px) + 'h' + px + 'v' + px + 'h-' + px + 'z');
+      }
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + dim + '" height="' + dim +
+      '" viewBox="0 0 ' + dim + ' ' + dim + '" shape-rendering="crispEdges" role="img">' +
+      '<rect width="' + dim + '" height="' + dim + '" fill="#ffffff"/>' +
+      '<path d="' + path.join('') + '" fill="#000000"/></svg>';
+  }
+
+  return { encode: encode, toSvg: toSvg };
+}));
+
+</script>
+
+<script>
+(function(){
+'use strict';
+
+// ---------------------------------------------------------------- storage
+var KEY = 'fq.v1.';
+function load(k, d){ try{ var v = localStorage.getItem(KEY+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } }
+function save(k, v){ try{ localStorage.setItem(KEY+k, JSON.stringify(v)); }catch(e){} }
+function drop(k){ try{ localStorage.removeItem(KEY+k); }catch(e){} }
+
+var settings = load('set', { longVowel:true, upper:false, keep:true, level:'M' });
+var mapping  = load('map', null);
+var romaOver = load('roma', {});   // カルテ番号 -> 手で直したローマ字
+
+// ---------------------------------------------------------------- kana -> romaji
+var KANA2 = {
+  'キャ':'kya','キュ':'kyu','キョ':'kyo','シャ':'sha','シュ':'shu','ショ':'sho',
+  'チャ':'cha','チュ':'chu','チョ':'cho','ニャ':'nya','ニュ':'nyu','ニョ':'nyo',
+  'ヒャ':'hya','ヒュ':'hyu','ヒョ':'hyo','ミャ':'mya','ミュ':'myu','ミョ':'myo',
+  'リャ':'rya','リュ':'ryu','リョ':'ryo','ギャ':'gya','ギュ':'gyu','ギョ':'gyo',
+  'ジャ':'ja','ジュ':'ju','ジョ':'jo','ヂャ':'ja','ヂュ':'ju','ヂョ':'jo',
+  'ビャ':'bya','ビュ':'byu','ビョ':'byo','ピャ':'pya','ピュ':'pyu','ピョ':'pyo',
+  'シェ':'she','ジェ':'je','チェ':'che','ティ':'ti','ディ':'di','デュ':'dyu',
+  'トゥ':'tu','ドゥ':'du','ファ':'fa','フィ':'fi','フェ':'fe','フォ':'fo',
+  'ウィ':'wi','ウェ':'we','ウォ':'wo','ヴァ':'va','ヴィ':'vi','ヴェ':'ve','ヴォ':'vo',
+  'クァ':'kwa','クォ':'kwo','ツァ':'tsa','ツィ':'tsi','ツェ':'tse','ツォ':'tso'
+};
+var KANA1 = {
+  'ア':'a','イ':'i','ウ':'u','エ':'e','オ':'o',
+  'カ':'ka','キ':'ki','ク':'ku','ケ':'ke','コ':'ko',
+  'サ':'sa','シ':'shi','ス':'su','セ':'se','ソ':'so',
+  'タ':'ta','チ':'chi','ツ':'tsu','テ':'te','ト':'to',
+  'ナ':'na','ニ':'ni','ヌ':'nu','ネ':'ne','ノ':'no',
+  'ハ':'ha','ヒ':'hi','フ':'fu','ヘ':'he','ホ':'ho',
+  'マ':'ma','ミ':'mi','ム':'mu','メ':'me','モ':'mo',
+  'ヤ':'ya','ユ':'yu','ヨ':'yo',
+  'ラ':'ra','リ':'ri','ル':'ru','レ':'re','ロ':'ro',
+  'ワ':'wa','ヰ':'i','ヱ':'e','ヲ':'o','ン':'n',
+  'ガ':'ga','ギ':'gi','グ':'gu','ゲ':'ge','ゴ':'go',
+  'ザ':'za','ジ':'ji','ズ':'zu','ゼ':'ze','ゾ':'zo',
+  'ダ':'da','ヂ':'ji','ヅ':'zu','デ':'de','ド':'do',
+  'バ':'ba','ビ':'bi','ブ':'bu','ベ':'be','ボ':'bo',
+  'パ':'pa','ピ':'pi','プ':'pu','ペ':'pe','ポ':'po',
+  'ヴ':'bu','ァ':'a','ィ':'i','ゥ':'u','ェ':'e','ォ':'o',
+  'ャ':'ya','ュ':'yu','ョ':'yo'
+};
+
+function toKatakana(s){
+  return String(s||'').replace(/[\u3041-\u3096]/g, function(c){
+    return String.fromCharCode(c.charCodeAt(0)+0x60);
+  }).replace(/[\uFF66-\uFF9D]/g, function(c){ return c; });
+}
+
+function kanaToRomaji(kana){
+  var s = toKatakana(kana).replace(/[\s\u3000]/g,'');
+  if(!s) return '';
+  var out = '', i = 0;
+  while(i < s.length){
+    var two = s.substr(i,2);
+    if(KANA2[two]){ out += KANA2[two]; i += 2; continue; }
+    var one = s.charAt(i);
+    if(one === 'ッ'){
+      var nx = KANA2[s.substr(i+1,2)] || KANA1[s.charAt(i+1)] || '';
+      if(nx.indexOf('ch') === 0) out += 't';
+      else if(nx) out += nx.charAt(0);
+      i += 1; continue;
+    }
+    if(one === 'ー' || one === '－' || one === '-'){ i += 1; continue; }
+    if(KANA1[one]){ out += KANA1[one]; i += 1; continue; }
+    if(/[A-Za-z]/.test(one)){ out += one.toLowerCase(); i += 1; continue; }
+    i += 1;
+  }
+  // ん + b/m/p -> m
+  out = out.replace(/n(?=[bmp])/g, 'm');
+  if(settings.longVowel){
+    // 長音は省く。ただし後ろに母音が続くときは残す（井上=Inoue）。
+    out = out.replace(/ou(?![aiueo])/g, 'o')
+             .replace(/oo(?![aiueo])/g, 'o')
+             .replace(/uu(?![aiueo])/g, 'u');
+  }
+  return out;
+}
+
+// 「テイ ゴツク フオン」のように名が複数語のときは語ごとに変換する
+function romajiOf(kanaPart){
+  return String(kanaPart || '').split(/[\s\u3000]+/).filter(function(x){ return x; })
+    .map(function(x){ return caseFix(kanaToRomaji(x)); }).join(' ');
+}
+
+function caseFix(r){
+  if(!r) return '';
+  return settings.upper ? r.toUpperCase() : (r.charAt(0).toUpperCase() + r.slice(1).toLowerCase());
+}
+
+// ---------------------------------------------------------------- dates
+var ERA = { 'M':1867, 'T':1911, 'S':1925, 'H':1988, 'R':2018,
+            '明治':1867, '大正':1911, '昭和':1925, '平成':1988, '令和':2018 };
+
+function normDob(v){
+  var s = String(v||'').trim();
+  if(!s) return '';
+  s = s.replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); });
+  var m;
+  m = s.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if(m) return m[1] + pad2(m[2]) + pad2(m[3]);
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m) return m[1] + m[2] + m[3];
+  m = s.match(/^(明治|大正|昭和|平成|令和|[MTSHR])\D*(\d{1,2})\D+(\d{1,2})\D+(\d{1,2})/i);
+  if(m){
+    var base = ERA[m[1]] || ERA[m[1].toUpperCase()];
+    if(base) return String(base + parseInt(m[2],10)) + pad2(m[3]) + pad2(m[4]);
+  }
+  return '';
+}
+function pad2(n){ n = String(parseInt(n,10)); return n.length < 2 ? '0'+n : n; }
+function realDate(d){
+  if(!d || d.length !== 8) return false;
+  var y = +d.slice(0,4), m = +d.slice(4,6), day = +d.slice(6,8);
+  if(m < 1 || m > 12 || day < 1) return false;
+  var dt = new Date(Date.UTC(y, m-1, day));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m-1 && dt.getUTCDate() === day;
+}
+function prettyDob(d){ return d && d.length===8 ? d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8) : ''; }
+
+// ---------------------------------------------------------------- csv
+function decodeBytes(buf){
+  var u8 = new Uint8Array(buf);
+  if(u8[0]===0xEF && u8[1]===0xBB && u8[2]===0xBF){
+    return new TextDecoder('utf-8').decode(u8.subarray(3));
+  }
+  try{ return new TextDecoder('utf-8', {fatal:true}).decode(u8); }catch(e){}
+  try{ return new TextDecoder('shift_jis').decode(u8); }catch(e){}
+  return new TextDecoder('utf-8').decode(u8);
+}
+
+function splitRows(text, delim){
+  var rows=[], row=[], cur='', quoted=false, i=0;
+  while(i < text.length){
+    var ch = text.charAt(i);
+    if(quoted){
+      if(ch === '"'){
+        if(text.charAt(i+1) === '"'){ cur += '"'; i += 2; continue; }
+        quoted = false; i++; continue;
+      }
+      cur += ch; i++; continue;
+    }
+    if(ch === '"'){ quoted = true; i++; continue; }
+    if(ch === delim){ row.push(cur); cur=''; i++; continue; }
+    if(ch === '\r'){ i++; continue; }
+    if(ch === '\n'){ row.push(cur); rows.push(row); row=[]; cur=''; i++; continue; }
+    cur += ch; i++;
+  }
+  if(cur !== '' || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(c){ return String(c).trim() !== ''; }); });
+}
+
+function parseTable(text){
+  var head = text.split(/\r?\n/)[0] || '';
+  var delim = (head.split('\t').length > head.split(',').length) ? '\t' : ',';
+  return splitRows(text, delim);
+}
+
+var HINTS = {
+  id:     ['カルテ番号','患者番号','患者ID','診察券番号','カルテNo','患者コード','ID','患者№','番号'],
+  last:   ['姓','患者姓','氏','苗字','名字'],
+  first:  ['名','患者名','下の名前'],
+  full:   ['氏名','患者氏名','患者名','名前','漢字氏名'],
+  kana:   ['カナ','かな','フリガナ','ふりがな','ヨミ','よみ','読み','カナ氏名','患者カナ'],
+  dob:    ['生年月日','誕生日','生年月日(西暦)','DOB','birth'],
+  romaji: ['ローマ字','ローマ字氏名','romaji','alphabet','英字'],
+  visit:  ['予約日','診察日','来院日','受診日','予約日時']
+};
+
+// 1列が2つの役に取られないよう、確実なものから順に確保していく。
+function guessAll(headers){
+  var used = {};
+  function take(kind, fuzzy){
+    var hs = HINTS[kind], i, j, h;
+    for(j = 0; j < hs.length; j++) for(i = 0; i < headers.length; i++){
+      if(used[i]) continue;
+      if(String(headers[i]).trim() === hs[j]){ used[i] = 1; return i; }
+    }
+    if(fuzzy){
+      for(j = 0; j < hs.length; j++){
+        if(hs[j].length < 2) continue;   // 「姓」「名」一文字での部分一致は誤爆する
+        for(i = 0; i < headers.length; i++){
+          if(used[i]) continue;
+          h = String(headers[i]).trim().toLowerCase();
+          if(h && h.indexOf(hs[j].toLowerCase()) >= 0){ used[i] = 1; return i; }
+        }
+      }
+    }
+    return -1;
+  }
+  var g = {};
+  g.id     = take('id', true);
+  g.kana   = take('kana', true);
+  g.dob    = take('dob', true);
+  g.romaji = take('romaji', true);
+  g.full   = take('full', true);
+  g.visit  = take('visit', true);
+  g.last   = take('last', false);
+  g.first  = take('first', false);
+  return g;
+}
+
+function splitName(full){
+  var s = String(full||'').trim().replace(/\u3000/g,' ');
+  var p = s.split(/\s+/).map(function(x){ return x.replace(/[,\u3001]+$/,'').replace(/^[,\u3001]+/,''); })
+           .filter(function(x){ return x !== ''; });
+  if(p.length >= 2) return { last:p[0], first:p.slice(1).join(' ') };
+  return { last:(p[0]||''), first:'' };
+}
+
+function buildPatient(id, idRaw, last, first, kana, romajiCol, dob){
+  var kp = kana ? splitName(kana) : { last:'', first:'' };
+  var rLast = '', rFirst = '', fromCsv = false;
+  if(romajiCol){
+    var rp = splitName(romajiCol);
+    rLast = caseFix(rp.last); rFirst = caseFix(rp.first); fromCsv = true;
+  } else {
+    rLast = romajiOf(kp.last);
+    rFirst = romajiOf(kp.first);
+  }
+  return { id:id, idRaw:idRaw, last:last, first:first, kana:kana,
+           romaLast:rLast, romaFirst:rFirst, romaFromCsv:fromCsv, dob:dob, blocked:false };
+}
+
+// 90で始まる6桁はQRを作らない番号として扱う
+function isBlockedId(raw){ return /^90\d{4}$/.test(raw); }
+
+function processRows(table, map){
+  var report = { blank:0, incomplete:0, dup:0, padded:0, made:0, blocked:[], visit:'', missing:[] };
+  var seen = {}, list = [], i;
+
+  for(i = 1; i < table.length; i++){
+    var r = table[i];
+    var get = function(ix){ return ix >= 0 && ix < r.length ? String(r[ix]).trim() : ''; };
+
+    var idRaw = get(map.id), kana = get(map.kana), dobRaw = get(map.dob);
+    var last = get(map.last), first = get(map.first);
+    if(!last && map.full >= 0){ var sp = splitName(get(map.full)); last = sp.last; first = sp.first; }
+
+    if(!idRaw && !kana && !dobRaw && !last && !first){ report.blank++; continue; }
+    if(!report.visit && map.visit >= 0 && get(map.visit)) report.visit = get(map.visit);
+
+    if(isBlockedId(idRaw)){
+      report.blocked.push({ id:idRaw, kana:kana });
+      list.push(function(){
+        var p = buildPatient(idRaw, idRaw, last, first, kana, get(map.romaji), normDob(dobRaw));
+        p.blocked = true; return p;
+      }());
+      continue;
+    }
+
+    var dob = normDob(dobRaw);
+    if(!idRaw || !kana || !dob){
+      report.incomplete++;
+      report.missing.push({ id:idRaw, kana:kana, dob:dobRaw });
+      continue;
+    }
+
+    var id = idRaw;
+    if(/^\d+$/.test(id) && id.length < 5){ id = ('00000' + id).slice(-5); report.padded++; }
+
+    if(seen[id]){ report.dup++; continue; }
+    seen[id] = 1;
+
+    list.push(buildPatient(id, idRaw, last, first, kana, get(map.romaji), dob));
+    report.made++;
+  }
+  return { list:list, report:report };
+}
+
+// ---------------------------------------------------------------- state
+var patients = [];
+var current = null;
+var lastReport = null;
+
+// 番号の小さい順。数字どうしは数として比べる。
+function compareId(a, b){
+  var x = a.id, y = b.id;
+  var nx = /^\d+$/.test(x), ny = /^\d+$/.test(y);
+  if(nx && ny){ var d = parseInt(x, 10) - parseInt(y, 10); if(d) return d; }
+  else if(nx !== ny){ return nx ? -1 : 1; }
+  return x < y ? -1 : (x > y ? 1 : 0);
+}
+function sortById(list){ return list.slice().sort(compareId); }
+
+function shownName(p){
+  var k = (p.last || '') + (p.first ? '　' + p.first : '');
+  return k || p.kana || '(氏名なし)';
+}
+var qrSize = load('qrsize', 340);
+
+function todayKey(){
+  var d = new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+}
+
+function restore(){
+  if(!settings.keep) return;
+  var box = load('day', null);
+  if(box && box.date === todayKey() && box.list && box.list.length){
+    patients = box.list;
+    lastReport = box.report || null;
+  }
+}
+function persist(){
+  if(settings.keep) save('day', { date: todayKey(), list: patients, report: lastReport });
+  else drop('day');
+}
+
+// ---------------------------------------------------------------- payload
+function romaOf(p){
+  var o = romaOver[p.id];
+  if(o) { var sp = splitName(o); return { last: sp.last, first: sp.first }; }
+  return { last: p.romaLast, first: p.romaFirst };
+}
+function payload(p){
+  var r = romaOf(p);
+  return [p.id, r.last, r.first, '', p.dob].join('\t');
+}
+function showable(s){ return s.replace(/\t/g, ' ⇥ '); }
+
+// ---------------------------------------------------------------- render
+var $ = function(id){ return document.getElementById(id); };
+var stage = $('stage'), rowsEl = $('rows');
+
+function renderBar(){
+  if(!patients.length){
+    $('dayInfo').textContent = '';
+    $('btnReport').classList.add('hide');
+    $('btnClear').classList.add('hide');
+    return;
+  }
+  $('btnClear').classList.remove('hide');
+  var made = patients.filter(function(p){ return !p.blocked; }).length;
+  var blocked = patients.length - made;
+  $('dayInfo').textContent =
+    (lastReport && lastReport.visit ? '予約日 ' + lastReport.visit + '　' : '') +
+    'QR ' + made + '名' + (blocked ? '　QRなし ' + blocked + '名' : '');
+  $('btnReport').classList.remove('hide');
+}
+
+function renderList(){
+  var term = $('q').value.trim().toLowerCase();
+  var shown = sortById(patients).filter(function(p){
+    if(!term) return true;
+    return (p.id + ' ' + p.last + p.first + ' ' + (p.kana||'') + ' ' +
+            p.romaLast + ' ' + p.romaFirst).toLowerCase().indexOf(term) >= 0;
+  });
+  rowsEl.innerHTML = '';
+  shown.forEach(function(p){
+    var b = document.createElement('button');
+    b.className = 'row' + (current && current.id === p.id ? ' on' : '');
+    b.type = 'button';
+    var r = romaOf(p);
+    b.innerHTML = '<div class="id"></div><div class="nm"></div><div class="rj"></div>';
+    if(p.blocked) b.className += ' off';
+    b.children[0].textContent = p.id + (p.blocked ? '　QRなし' : '');
+    b.children[1].textContent = shownName(p);
+    b.children[2].textContent = p.blocked ? '' : ((r.last || '') + (r.first ? ' ' + r.first : ''));
+    b.addEventListener('click', function(){ select(p); });
+    rowsEl.appendChild(b);
+  });
+  $('count').textContent = patients.length
+    ? (term ? shown.length + ' / ' + patients.length + '名' : patients.length + '名')
+    : '';
+}
+
+function renderStage(){
+  stage.innerHTML = '';
+  if(!current){
+    if(patients.length){
+      var hint = document.createElement('div');
+      hint.className = 'drop';
+      hint.innerHTML = '<h2>左から患者さんを選んでください</h2>' +
+        '<p>選ぶと大きなQRが出ます。Volusonの患者登録画面を開いて、そのまま読ませてください。</p>';
+      stage.appendChild(hint);
+    } else {
+      stage.appendChild(buildDrop());
+    }
+    return;
+  }
+
+  if(current.blocked){
+    var stop = document.createElement('div');
+    stop.className = 'drop';
+    stop.innerHTML = '<h2></h2><p>90で始まる6桁の番号は、QRを作らない決まりにしています。' +
+      'この方はこれまでどおりの方法でVolusonに入力してください。</p>';
+    stop.children[0].textContent = current.id + '　' + shownName(current);
+    stage.appendChild(stop);
+    return;
+  }
+
+  var str = payload(current);
+  var card = document.createElement('div');
+  card.className = 'card';
+  var qr = QR.encode(str, { level: settings.level });
+  card.innerHTML = QR.toSvg(qr, { scale: 8, quiet: 4 });
+  card.style.setProperty('--qr', qrSize + 'px');
+  stage.appendChild(card);
+
+  var r = romaOf(current);
+  var who = document.createElement('div');
+  who.className = 'who';
+  who.innerHTML = '<div class="kanji"></div><div class="meta"></div><div class="dob"></div><div class="raw"></div>';
+  who.children[0].textContent = shownName(current);
+  who.children[1].textContent = current.id + '　' + (r.last||'') + ' ' + (r.first||'');
+  who.children[2].textContent = prettyDob(current.dob) || '生年月日なし';
+  who.children[3].textContent = showable(str) + '　（' + qr.size + '×' + qr.size + '・' + settings.level + '）';
+  stage.appendChild(who);
+
+  var sizes = document.createElement('div');
+  sizes.className = 'sizes';
+  [['小',260],['中',340],['大',440]].forEach(function(s){
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = s[0];
+    if(qrSize === s[1]) b.className = 'on';
+    b.addEventListener('click', function(){ qrSize = s[1]; save('qrsize', qrSize); renderStage(); });
+    sizes.appendChild(b);
+  });
+  var edit = document.createElement('button');
+  edit.type = 'button'; edit.textContent = 'ローマ字を直す';
+  edit.addEventListener('click', function(){ editRomaji(current); });
+  sizes.appendChild(edit);
+  stage.appendChild(sizes);
+
+  if(!current.dob || !realDate(current.dob)){
+    var w = document.createElement('div');
+    w.className = 'note';
+    w.textContent = current.dob
+      ? '生年月日が日付として成立していません（' + current.dob + '）。CSVの元データを確認してください。'
+      : '生年月日が空です。Volusonの生年月日欄は埋まりません。';
+    stage.appendChild(w);
+  }
+}
+
+function buildDrop(){
+  var d = document.createElement('div');
+  d.className = 'drop';
+  d.id = 'dropZone';
+  d.innerHTML =
+    '<h2>今日のCSVをここに置いてください</h2>' +
+    '<button class="btn" id="pick">ファイルを選ぶ</button>' +
+    '<div class="note">CSVはこのパソコンの中だけで読み込みます。どこにも送信しません。<br>' +
+    '当日追加の方は、上の「手入力で出す」から出せます。</div>';
+  d.addEventListener('click', function(e){ if(e.target.id === 'pick') $('file').click(); });
+  return d;
+}
+
+function select(p){
+  current = p;
+  renderList();
+  renderStage();
+}
+
+function editRomaji(p){
+  var r = romaOf(p);
+  var v = window.prompt('ローマ字を「姓 名」の形で入力してください。\nこのカルテ番号に対して記憶します。',
+                        (r.last||'') + ' ' + (r.first||''));
+  if(v == null) return;
+  v = v.trim();
+  if(v){ romaOver[p.id] = v; } else { delete romaOver[p.id]; }
+  save('roma', romaOver);
+  renderList(); renderStage();
+}
+
+// ---------------------------------------------------------------- csv flow
+var pendingTable = null;
+var pendingLast = null;
+
+function handleFile(f){
+  if(!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var text = decodeBytes(fr.result);
+    var table = parseTable(text);
+    pendingLast = table;
+    if(table.length < 2){ alert('データ行が見つかりませんでした。CSVの中身を確認してください。'); return; }
+    var auto = guessAll(table[0]);
+    if(auto.id >= 0 && auto.kana >= 0 && auto.dob >= 0){
+      applyImport(table, auto);        // 見出しが読めたのでそのまま取り込む
+    } else if(mapping && mapping.id >= 0 && mapping.id < table[0].length){
+      applyImport(table, mapping);
+    } else {
+      pendingTable = table;
+      openMapping(table);
+    }
+  };
+  fr.onerror = function(){ alert('ファイルを読めませんでした。'); };
+  fr.readAsArrayBuffer(f);
+}
+
+function applyImport(table, map){
+  var out = processRows(table, map);
+  if(!out.list.length){
+    pendingTable = table;
+    openMapping(table);
+    $('mapMsg').textContent = 'この設定では1件も作れませんでした。列の選び方を見直してください。';
+    $('mapMsg').classList.remove('hide');
+    return;
+  }
+  mapping = map; save('map', mapping);
+  patients = sortById(out.list); lastReport = out.report; current = null;
+  persist(); renderBar(); renderList(); renderStage();
+  openReport();
+}
+
+function openReport(){
+  var r = lastReport;
+  if(!r){ return; }
+  var vis = normDob(r.visit);
+  var tk = todayKey().replace(/-/g, '');
+  $('repSub').textContent = r.visit
+    ? ('予約日 ' + r.visit + ' のファイルを読み込みました。' +
+       (vis && vis !== tk ? '　今日（' + todayKey() + '）とは違う日付です。' : ''))
+    : 'ファイルを読み込みました。';
+  var body = $('repBody');
+  body.innerHTML = '';
+
+  var tally = document.createElement('div');
+  tally.className = 'tally';
+  var lines = [
+    ['QRを作った', r.made + '名', false],
+    ['4桁以下だったので頭に0を足した', r.padded + '名', false],
+    ['同じ番号が重なっていたので1つにした', r.dup + '名', false],
+    ['番号・かな・生年月日のどれかが空で外した', r.incomplete + '件', r.incomplete > 0],
+    ['空行として飛ばした', r.blank + '行', false],
+    ['90で始まる6桁でQRを作らなかった', r.blocked.length + '名', r.blocked.length > 0]
+  ];
+  lines.forEach(function(l){
+    var k = document.createElement('div'); k.className = 'k' + (l[2] ? ' hit' : ''); k.textContent = l[0];
+    var v = document.createElement('div'); v.className = 'v' + (l[2] ? ' hit' : ''); v.textContent = l[1];
+    tally.appendChild(k); tally.appendChild(v);
+  });
+  body.appendChild(tally);
+
+  if(r.blocked.length){
+    var b1 = document.createElement('div');
+    b1.className = 'repblock';
+    b1.innerHTML = '<h3>QRを作らなかった方（90始まりの6桁）</h3><div class="sample"></div>';
+    b1.querySelector('.sample').textContent = r.blocked.map(function(x){
+      return x.id + '  ' + (x.kana || '(かななし)');
+    }).join('\n');
+    body.appendChild(b1);
+  }
+  if(r.missing.length){
+    var b2 = document.createElement('div');
+    b2.className = 'repblock';
+    b2.innerHTML = '<h3>項目が足りず外した行</h3><div class="sample"></div>';
+    b2.querySelector('.sample').textContent = r.missing.slice(0, 40).map(function(x){
+      var lack = [];
+      if(!x.id) lack.push('番号');
+      if(!x.kana) lack.push('かな');
+      if(!normDob(x.dob)) lack.push('生年月日');
+      return (x.id || '(番号なし)') + '  ' + (x.kana || '(かななし)') + '  ← ' + lack.join('・') + 'が空';
+    }).join('\n') + (r.missing.length > 40 ? '\n… ほか' + (r.missing.length - 40) + '件' : '');
+    body.appendChild(b2);
+  }
+  $('repSheet').classList.remove('hide');
+}
+
+$('btnReport').addEventListener('click', openReport);
+$('btnClear').addEventListener('click', function(){
+  if(!window.confirm('今日の一覧を消します。列の設定と、直したローマ字はそのまま残ります。よろしいですか。')) return;
+  patients = []; current = null; lastReport = null; pendingLast = null;
+  drop('day');
+  $('q').value = '';
+  renderBar(); renderList(); renderStage();
+});
+$('repClose').addEventListener('click', function(){ $('repSheet').classList.add('hide'); });
+$('btnCols').addEventListener('click', function(){
+  if(!pendingLast){ alert('先にCSVを読み込んでください。'); return; }
+  pendingTable = pendingLast;
+  openMapping(pendingLast);
+});
+
+function fillSelect(sel, headers, chosen, allowNone){
+  sel.innerHTML = '';
+  if(allowNone){
+    var o = document.createElement('option');
+    o.value = '-1'; o.textContent = '（使わない）';
+    sel.appendChild(o);
+  }
+  headers.forEach(function(h, i){
+    var o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = (h && String(h).trim()) ? String(h).trim() : ('第' + (i+1) + '列');
+    sel.appendChild(o);
+  });
+  sel.value = String(chosen == null ? -1 : chosen);
+}
+
+function openMapping(table){
+  var headers = table[0];
+  var auto = guessAll(headers);
+  var g = mapping || {};
+  var pick = function(kind, saved){
+    if(saved != null && saved >= 0 && saved < headers.length) return saved;
+    return auto[kind];
+  };
+  fillSelect($('mId'),     headers, pick('id', g.id), true);
+  fillSelect($('mLast'),   headers, pick('last', g.last), true);
+  fillSelect($('mFirst'),  headers, pick('first', g.first), true);
+  fillSelect($('mFull'),   headers, pick('full', g.full), true);
+  fillSelect($('mKana'),   headers, pick('kana', g.kana), true);
+  fillSelect($('mDob'),    headers, pick('dob', g.dob), true);
+  fillSelect($('mRomaji'), headers, pick('romaji', g.romaji), true);
+  updateMapPreview();
+  $('mapMsg').classList.add('hide');
+  $('mapSheet').classList.remove('hide');
+}
+
+function currentMapping(){
+  var n = function(id){ return parseInt($(id).value, 10); };
+  return { id:n('mId'), last:n('mLast'), first:n('mFirst'), full:n('mFull'),
+           kana:n('mKana'), dob:n('mDob'), romaji:n('mRomaji') };
+}
+
+function updateMapPreview(){
+  if(!pendingTable) return;
+  var m = currentMapping();
+  var out = processRows(pendingTable.slice(0, 6), m);
+  var usable = out.list.filter(function(p){ return !p.blocked; });
+  if(!usable.length){ $('mapPreview').textContent = 'この設定では1件も作れません。カルテ番号・かな・生年月日の列を確認してください。'; return; }
+  $('mapPreview').textContent = usable.map(function(p){ return showable(payload(p)); }).join('\n');
+}
+
+['mId','mLast','mFirst','mFull','mKana','mDob','mRomaji'].forEach(function(id){
+  $(id).addEventListener('change', updateMapPreview);
+});
+
+$('mapOk').addEventListener('click', function(){
+  var m = currentMapping();
+  if(m.id < 0){
+    $('mapMsg').textContent = 'カルテ番号の列を選んでください。';
+    $('mapMsg').classList.remove('hide'); return;
+  }
+  var t = pendingTable;
+  $('mapSheet').classList.add('hide');
+  pendingTable = null;
+  applyImport(t, m);
+});
+$('mapCancel').addEventListener('click', function(){
+  $('mapSheet').classList.add('hide'); pendingTable = null;
+});
+
+$('file').addEventListener('change', function(){ handleFile(this.files[0]); this.value = ''; });
+$('btnCsv').addEventListener('click', function(){ $('file').click(); });
+
+['dragenter','dragover'].forEach(function(ev){
+  document.addEventListener(ev, function(e){
+    e.preventDefault();
+    var z = $('dropZone'); if(z) z.classList.add('hot');
+  });
+});
+['dragleave','drop'].forEach(function(ev){
+  document.addEventListener(ev, function(e){
+    e.preventDefault();
+    var z = $('dropZone'); if(z) z.classList.remove('hot');
+  });
+});
+document.addEventListener('drop', function(e){
+  if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+// ---------------------------------------------------------------- manual
+$('btnManual').addEventListener('click', function(){
+  $('manMsg').classList.add('hide');
+  $('manSheet').classList.remove('hide');
+  $('fId').focus();
+});
+$('fKana').addEventListener('input', function(){
+  var sp = splitName(this.value);
+  var l = romajiOf(sp.last), f = romajiOf(sp.first);
+  $('fRomaji').value = (l + (f ? ' ' + f : '')).trim();
+});
+$('manOk').addEventListener('click', function(){
+  var id = $('fId').value.trim();
+  if(!id){
+    $('manMsg').textContent = 'カルテ番号を入れてください。';
+    $('manMsg').classList.remove('hide'); return;
+  }
+  if(isBlockedId(id)){
+    $('manMsg').textContent = '90で始まる6桁の番号は、QRを作らない決まりにしています。';
+    $('manMsg').classList.remove('hide'); return;
+  }
+  if(/^\d+$/.test(id) && id.length < 5) id = ('00000' + id).slice(-5);
+  var p = buildPatient(id, id, $('fLast').value.trim(), $('fFirst').value.trim(),
+                       $('fKana').value.trim(), $('fRomaji').value.trim(), normDob($('fDob').value));
+  patients = sortById(patients.filter(function(x){ return x.id !== p.id; }).concat([p]));
+  persist(); renderBar(); select(p);
+  ['fId','fLast','fFirst','fKana','fRomaji','fDob'].forEach(function(i){ $(i).value = ''; });
+  $('manSheet').classList.add('hide');
+});
+$('manCancel').addEventListener('click', function(){ $('manSheet').classList.add('hide'); });
+
+// ---------------------------------------------------------------- scan test
+$('btnScan').addEventListener('click', function(){
+  $('scanSheet').classList.remove('hide');
+  $('scanIn').value = ''; $('scanIn').focus();
+});
+$('scanClose').addEventListener('click', function(){ $('scanSheet').classList.add('hide'); });
+$('scanIn').addEventListener('keydown', function(e){
+  // QRに埋め込んだTabはキー入力として届く。ここでは文字として飲み込む。
+  if(e.key === 'Enter'){ e.preventDefault(); return; }
+  if(e.key === 'Tab' && !e.shiftKey){
+    e.preventDefault();
+    var el = this, st = el.selectionStart, en = el.selectionEnd;
+    el.value = el.value.slice(0, st) + '\t' + el.value.slice(en);
+    el.selectionStart = el.selectionEnd = st + 1;
+    el.dispatchEvent(new Event('input'));
+  }
+});
+$('scanIn').addEventListener('input', function(){
+  var v = this.value;
+  if(!v){ $('scanOut').textContent = 'まだ何も届いていません。'; return; }
+  var parts = v.split('\t');
+  var lines = ['届いた文字列：', showable(v), '', '区切りの数：' + (parts.length - 1) + '（5欄なら4つ）'];
+  ['カルテ番号','姓','名','ミドルネーム','生年月日'].forEach(function(lab, i){
+    lines.push(lab + '：' + (parts[i] === undefined ? '—' : (parts[i] === '' ? '（空欄）' : parts[i])));
+  });
+  $('scanOut').textContent = lines.join('\n');
+});
+
+// ---------------------------------------------------------------- settings
+function syncSettings(){
+  $('sLong').checked = !!settings.longVowel;
+  $('sUpper').checked = !!settings.upper;
+  $('sKeep').checked = !!settings.keep;
+  $('sLevel').value = settings.level;
+  $('setPreview').textContent =
+    'ヤマダ ハナコ → ' + caseFix(kanaToRomaji('ヤマダ')) + ' ' + caseFix(kanaToRomaji('ハナコ')) + '\n' +
+    'サトウ ユウキ → ' + caseFix(kanaToRomaji('サトウ')) + ' ' + caseFix(kanaToRomaji('ユウキ')) + '\n' +
+    'イノウエ ケンイチ → ' + caseFix(kanaToRomaji('イノウエ')) + ' ' + caseFix(kanaToRomaji('ケンイチ'));
+}
+function reRomanize(){
+  patients.forEach(function(p){
+    if(!p.kana || p.romaFromCsv) return;
+    var sp = splitName(p.kana);
+    p.romaLast = romajiOf(sp.last);
+    p.romaFirst = romajiOf(sp.first);
+  });
+}
+$('btnSet').addEventListener('click', function(){
+  syncSettings(); $('setMsg').classList.add('hide'); $('setSheet').classList.remove('hide');
+});
+['sLong','sUpper','sKeep'].forEach(function(id){
+  $(id).addEventListener('change', function(){
+    settings.longVowel = $('sLong').checked;
+    settings.upper = $('sUpper').checked;
+    settings.keep = $('sKeep').checked;
+    save('set', settings);
+    reRomanize(); persist(); syncSettings(); renderList(); renderStage();
+  });
+});
+$('sLevel').addEventListener('change', function(){
+  settings.level = this.value; save('set', settings); renderStage();
+});
+$('setClose').addEventListener('click', function(){ $('setSheet').classList.add('hide'); });
+$('setWipe').addEventListener('click', function(){
+  if(!window.confirm('今日の一覧・列の設定・直したローマ字を、このパソコンから消します。よろしいですか。')) return;
+  drop('day'); drop('map'); drop('roma');
+  mapping = null; romaOver = {}; patients = []; current = null;
+  renderBar(); renderList(); renderStage();
+  $('setMsg').textContent = '消しました。';
+  $('setMsg').classList.remove('hide');
+});
+
+// ---------------------------------------------------------------- keys
+$('q').addEventListener('input', renderList);
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    ['mapSheet','manSheet','scanSheet','setSheet','repSheet'].forEach(function(id){ $(id).classList.add('hide'); });
+    return;
+  }
+  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet'].some(function(id){
+    return !$(id).classList.contains('hide');
+  });
+  if(open) return;
+  if(e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  var btns = rowsEl.querySelectorAll('.row');
+  if(!btns.length) return;
+  e.preventDefault();
+  var idx = -1, i;
+  for(i = 0; i < btns.length; i++) if(btns[i].classList.contains('on')) idx = i;
+  idx = e.key === 'ArrowDown' ? Math.min(btns.length - 1, idx + 1) : Math.max(0, idx - 1);
+  btns[idx].click();
+  btns[idx].scrollIntoView({ block:'nearest' });
+});
+
+// ---------------------------------------------------------------- go
+restore();
+renderBar(); renderList(); renderStage();
+
+})();
+</script>
+</body>
+</html>
