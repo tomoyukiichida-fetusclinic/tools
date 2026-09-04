@@ -44,6 +44,7 @@
   }
   .linkish:hover{color:var(--text);background:var(--raise)}
   .linkish:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  .linkish.warn{color:var(--warn);font-weight:600}
 
   .body{display:flex;flex:1;min-height:0}
 
@@ -187,6 +188,7 @@
     <button class="linkish" id="btnScan">読み取りテスト</button>
     <button class="linkish" id="btnCols">列の設定</button>
     <button class="linkish" id="btnSet">設定</button>
+    <button class="linkish" id="btnSync">Dropbox未接続</button>
   </div>
 
   <div class="body">
@@ -294,6 +296,21 @@
     <button class="btn ghost" id="setWipe">保存したデータを全部消す</button>
   </div>
   <div class="msg good hide" id="setMsg"></div>
+</div></div>
+
+<!-- dropbox sync -->
+<div class="sheet hide" id="syncSheet"><div class="inner">
+  <h2>Dropboxで一覧を共有する</h2>
+  <p class="sub">院内のDropboxアカウントに今日の一覧を保存し、他のパソコンで開いたときに自動で読み込みます。<br>
+    どのパソコンでも<strong>同じDropboxアカウント</strong>でログインしてください。</p>
+  <div class="sample" id="syncStatus">未接続</div>
+  <div class="actions">
+    <button class="btn" id="syncLogin">Dropboxにログイン</button>
+    <button class="btn" id="syncNow">今すぐ同期</button>
+    <button class="btn ghost" id="syncLogout">連携を解除</button>
+    <button class="btn ghost" id="syncClose">閉じる</button>
+  </div>
+  <div class="msg bad hide" id="syncMsg"></div>
 </div></div>
 
 <script>
@@ -948,16 +965,20 @@ function todayKey(){
 }
 
 function restore(){
-  if(!settings.keep) return;
+  if(!settings.keep && !Sync.enabled()) return;
   var box = load('day', null);
   if(box && box.date === todayKey() && box.list && box.list.length){
     patients = box.list;
     lastReport = box.report || null;
+    dayUpdated = box.updated || 0;
   }
 }
-function persist(){
-  if(settings.keep) save('day', { date: todayKey(), list: patients, report: lastReport });
+var dayUpdated = 0;   // 今日の一覧を最後に変更した時刻（同期の新旧判定に使う）
+function persist(push){
+  if(push !== false) dayUpdated = Date.now();
+  if(settings.keep || Sync.enabled()) save('day', { date: todayKey(), list: patients, report: lastReport, updated: dayUpdated });
   else drop('day');
+  if(push !== false) Sync.push();
 }
 
 // ---------------------------------------------------------------- payload
@@ -1093,7 +1114,9 @@ function buildDrop(){
   d.innerHTML =
     '<h2>今日のCSVをここに置いてください</h2>' +
     '<button class="btn" id="pick">ファイルを選ぶ</button>' +
-    '<div class="note">CSVはこのパソコンの中だけで読み込みます。どこにも送信しません。<br>' +
+    '<div class="note">' + (Sync.enabled()
+      ? 'CSVはこのパソコンで読み込み、院内のDropboxに保存して他のパソコンと共有します。'
+      : 'CSVはこのパソコンの中だけで読み込みます。どこにも送信しません。') + '<br>' +
     '当日追加の方は、上の「手入力で出す」から出せます。</div>';
   d.addEventListener('click', function(e){ if(e.target.id === 'pick') $('file').click(); });
   return d;
@@ -1114,6 +1137,7 @@ function editRomaji(p){
   if(v){ romaOver[p.id] = v; } else { delete romaOver[p.id]; }
   save('roma', romaOver);
   renderList(); renderStage();
+  persist();
 }
 
 // ---------------------------------------------------------------- csv flow
@@ -1218,6 +1242,7 @@ $('btnClear').addEventListener('click', function(){
   drop('day');
   $('q').value = '';
   renderBar(); renderList(); renderStage();
+  dayUpdated = Date.now(); Sync.push();
 });
 $('repClose').addEventListener('click', function(){ $('repSheet').classList.add('hide'); });
 $('btnCols').addEventListener('click', function(){
@@ -1422,10 +1447,10 @@ $('setWipe').addEventListener('click', function(){
 $('q').addEventListener('input', renderList);
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape'){
-    ['mapSheet','manSheet','scanSheet','setSheet','repSheet'].forEach(function(id){ $(id).classList.add('hide'); });
+    ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet'].forEach(function(id){ $(id).classList.add('hide'); });
     return;
   }
-  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet'].some(function(id){
+  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet'].some(function(id){
     return !$(id).classList.contains('hide');
   });
   if(open) return;
@@ -1440,9 +1465,203 @@ document.addEventListener('keydown', function(e){
   btns[idx].scrollIntoView({ block:'nearest' });
 });
 
+// ---------------------------------------------------------------- dropbox sync
+// 院内のDropboxアカウント（アプリ専用フォルダ）に day.json を置き、各PCで共有する。
+var Sync = (function(){
+  var APP_KEY  = 'dh1uuj82barexjw';
+  var FILE     = '/day.json';
+  var POLL_MS  = 30000;
+  var REDIRECT = location.origin + location.pathname;   // App Consoleに登録したURLと一致させる
+  var tok = load('dbx', null);          // { refresh, access, exp }
+  var lastPull = 0, lastPush = 0, timer = null, busy = false, lastErr = '';
+  var pushQueued = false;
+
+  function enabled(){ return !!(tok && tok.refresh); }
+  function hhmm(t){ var d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+  function setStatus(text, bad){
+    var b = $('btnSync');
+    if(!enabled()){ b.textContent = 'Dropbox未接続'; b.classList.add('warn'); }
+    else { b.textContent = bad ? 'Dropbox 同期エラー' : ('Dropbox ' + (lastPull ? '同期 ' + hhmm(lastPull) : '接続中')); b.classList.toggle('warn', !!bad); }
+    if(text != null) $('syncStatus').textContent = text;
+    $('syncLogin').classList.toggle('hide', enabled());
+    $('syncNow').classList.toggle('hide', !enabled());
+    $('syncLogout').classList.toggle('hide', !enabled());
+  }
+  function statusText(){
+    if(!enabled()) return '未接続。「Dropboxにログイン」を押してください。';
+    var s = '接続済み（同じアカウントでログインした他のパソコンと共有中）\n';
+    s += '最後に読み込んだ時刻：' + (lastPull ? hhmm(lastPull) : 'まだ') + '\n';
+    s += '最後に書き込んだ時刻：' + (lastPush ? hhmm(lastPush) : 'まだ');
+    if(lastErr) s += '\n直近のエラー：' + lastErr;
+    return s;
+  }
+  function refreshStatus(){ setStatus(statusText(), !!lastErr); }
+
+  // --- OAuth (PKCE)
+  function b64url(buf){
+    var s = '', a = new Uint8Array(buf);
+    for(var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function randomVerifier(){
+    var a = new Uint8Array(64); crypto.getRandomValues(a);
+    return b64url(a).slice(0, 96);
+  }
+  function login(){
+    var v = randomVerifier();
+    try{ sessionStorage.setItem(KEY + 'pkce', v); }catch(e){}
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)).then(function(h){
+      var u = 'https://www.dropbox.com/oauth2/authorize?client_id=' + APP_KEY +
+        '&response_type=code&code_challenge=' + b64url(h) + '&code_challenge_method=S256' +
+        '&token_access_type=offline&redirect_uri=' + encodeURIComponent(REDIRECT);
+      location.href = u;
+    });
+  }
+  function tokenRequest(params){
+    var body = Object.keys(params).map(function(k){ return k + '=' + encodeURIComponent(params[k]); }).join('&');
+    return fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body
+    }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error_description || j.error || ('HTTP ' + r.status)); return j; }); });
+  }
+  function finishLogin(code){
+    var v = ''; try{ v = sessionStorage.getItem(KEY + 'pkce') || ''; sessionStorage.removeItem(KEY + 'pkce'); }catch(e){}
+    return tokenRequest({ code: code, grant_type: 'authorization_code', code_verifier: v, client_id: APP_KEY, redirect_uri: REDIRECT })
+      .then(function(j){
+        tok = { refresh: j.refresh_token, access: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000 };
+        save('dbx', tok); lastErr = '';
+      });
+  }
+  function accessToken(){
+    if(!enabled()) return Promise.reject(new Error('未接続'));
+    if(tok.access && tok.exp > Date.now()) return Promise.resolve(tok.access);
+    return tokenRequest({ grant_type: 'refresh_token', refresh_token: tok.refresh, client_id: APP_KEY })
+      .then(function(j){
+        tok.access = j.access_token; tok.exp = Date.now() + (j.expires_in - 60) * 1000;
+        save('dbx', tok); return tok.access;
+      });
+  }
+  function logout(){
+    if(tok && tok.access){
+      fetch('https://api.dropboxapi.com/2/auth/token/revoke', { method:'POST', headers:{ Authorization: 'Bearer ' + tok.access } }).catch(function(){});
+    }
+    tok = null; drop('dbx'); lastPull = 0; lastPush = 0; lastErr = '';
+    if(timer){ clearInterval(timer); timer = null; }
+    refreshStatus(); renderStage();
+  }
+
+  // --- file transfer
+  function download(){
+    return accessToken().then(function(at){
+      return fetch('https://content.dropboxapi.com/2/files/download', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + at, 'Dropbox-API-Arg': JSON.stringify({ path: FILE }) }
+      });
+    }).then(function(r){
+      if(r.status === 409) return null;                       // まだファイルがない
+      if(!r.ok) return r.text().then(function(t){ throw new Error('download ' + r.status + ' ' + t.slice(0, 120)); });
+      return r.text().then(function(t){ try{ return JSON.parse(t); }catch(e){ return null; } });
+    });
+  }
+  function upload(obj){
+    return accessToken().then(function(at){
+      return fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + at,
+          'Dropbox-API-Arg': JSON.stringify({ path: FILE, mode: 'overwrite', mute: true }),
+          'Content-Type': 'application/octet-stream'
+        },
+        body: JSON.stringify(obj)
+      });
+    }).then(function(r){
+      if(!r.ok) return r.text().then(function(t){ throw new Error('upload ' + r.status + ' ' + t.slice(0, 120)); });
+    });
+  }
+
+  function snapshot(){
+    return { date: todayKey(), list: patients, report: lastReport, roma: romaOver, updated: dayUpdated };
+  }
+  function applyRemote(box){
+    var isToday = box && box.date === todayKey();
+    var list = isToday && box.list ? box.list : [];
+    var keepId = current ? current.id : null;
+    patients = sortById(list);
+    lastReport = isToday ? (box.report || null) : null;
+    if(box && box.roma && typeof box.roma === 'object'){ romaOver = box.roma; save('roma', romaOver); }
+    dayUpdated = box ? (box.updated || 0) : 0;
+    current = null;
+    if(keepId){ patients.forEach(function(p){ if(p.id === keepId) current = p; }); }
+    persist(false);
+    renderBar(); renderList(); renderStage();
+  }
+
+  function pull(){
+    if(!enabled() || busy) return Promise.resolve();
+    busy = true;
+    return download().then(function(box){
+      lastPull = Date.now(); lastErr = '';
+      if(box && (box.updated || 0) > dayUpdated){
+        applyRemote(box);                                     // 他のPCの方が新しい
+      } else if(patients.length && dayUpdated > (box ? (box.updated || 0) : 0)){
+        pushQueued = true;                                    // こちらの方が新しい → 後で書き込む
+      }
+    }).catch(function(e){ lastErr = e.message || String(e); })
+      .then(function(){ busy = false; refreshStatus(); if(pushQueued){ pushQueued = false; push(); } });
+  }
+  function push(){
+    if(!enabled()) return;
+    if(busy){ pushQueued = true; return; }
+    busy = true;
+    upload(snapshot()).then(function(){ lastPush = Date.now(); lastErr = ''; })
+      .catch(function(e){ lastErr = e.message || String(e); })
+      .then(function(){ busy = false; refreshStatus(); if(pushQueued){ pushQueued = false; push(); } });
+  }
+
+  function startPolling(){
+    if(timer) clearInterval(timer);
+    timer = setInterval(function(){ if(document.visibilityState !== 'hidden') pull(); }, POLL_MS);
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') pull(); });
+  }
+
+  function init(){
+    var m = /[?&]code=([^&]+)/.exec(location.search);
+    var done = Promise.resolve();
+    if(m){
+      history.replaceState(null, '', location.pathname);
+      done = finishLogin(decodeURIComponent(m[1])).catch(function(e){
+        lastErr = 'ログインに失敗しました：' + (e.message || e);
+        $('syncMsg').textContent = lastErr; $('syncMsg').classList.remove('hide');
+        $('syncSheet').classList.remove('hide');
+      });
+    } else if(/[?&]error=/.test(location.search)){
+      history.replaceState(null, '', location.pathname);
+      lastErr = 'Dropboxのログインが取り消されました。';
+    }
+    done.then(function(){
+      refreshStatus();
+      if(enabled()){ pull(); startPolling(); }
+    });
+  }
+
+  $('btnSync').addEventListener('click', function(){
+    $('syncMsg').classList.add('hide'); refreshStatus(); $('syncSheet').classList.remove('hide');
+  });
+  $('syncClose').addEventListener('click', function(){ $('syncSheet').classList.add('hide'); });
+  $('syncLogin').addEventListener('click', login);
+  $('syncNow').addEventListener('click', function(){ pull(); });
+  $('syncLogout').addEventListener('click', function(){
+    if(!window.confirm('このパソコンのDropbox連携を解除します。Dropbox上のデータは消えません。よろしいですか。')) return;
+    logout();
+  });
+
+  return { enabled: enabled, push: push, pull: pull, init: init };
+})();
+
 // ---------------------------------------------------------------- go
 restore();
 renderBar(); renderList(); renderStage();
+Sync.init();
 
 })();
 </script>
