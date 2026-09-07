@@ -191,6 +191,55 @@
   @media (prefers-reduced-motion:no-preference){
     .card{transition:opacity .12s ease}
   }
+
+  /* ---------- 印刷用の一覧 ---------- */
+  .printPane{position:fixed;inset:0;z-index:60;background:#fff;overflow:auto;padding:0 0 40px}
+  .pbar{
+    position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 20px;border-bottom:1px solid var(--line);background:var(--panel);
+  }
+  .pbar h2{margin:0;font-size:15px;font-weight:600}
+  .pbar .spacer{flex:1}
+  .pbar label{font-size:13.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .pbar select{padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--shell);font:inherit;font-size:13.5px;color:var(--text)}
+  .pbar .hintline{font-size:12.5px;color:var(--dim)}
+  .psheet{padding:16px 10px 0;max-width:200mm;margin:0 auto}
+  .phead{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin:0 6px 10px;font-size:12.5px;color:var(--dim)}
+  .phead strong{font-size:15px;color:var(--text);font-weight:600}
+  .pgrid{font-size:0}
+  .pcell{
+    display:inline-block;vertical-align:top;width:var(--pw,33.33%);
+    padding:5px;break-inside:avoid;page-break-inside:avoid;
+  }
+  .pbox{
+    border:1px solid var(--line);border-radius:6px;padding:8px;
+    display:flex;gap:9px;align-items:flex-start;background:#fff;
+  }
+  .pbox svg{width:var(--qrmm,31mm);height:var(--qrmm,31mm);display:block;flex:0 0 auto}
+  .pnoqr{
+    width:var(--qrmm,31mm);height:var(--qrmm,31mm);flex:0 0 auto;
+    border:1px dashed var(--line);border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--dim);
+  }
+  .pinfo{min-width:0;line-height:1.45}
+  .pinfo .pid{font-family:var(--mono);font-size:13.5px;font-weight:700}
+  .pinfo .pnm{font-size:14px;font-weight:600;word-break:break-all}
+  .pinfo .prj{font-family:var(--mono);font-size:11px;color:var(--dim);word-break:break-all}
+  .pinfo .pdb{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .pcell.off .pbox{background:#F6F7F8}
+  .pempty{font-size:14px;color:var(--dim);padding:20px 8px}
+
+  @page{size:A4 portrait;margin:10mm}
+  @media print{
+    html,body{height:auto;background:#fff}
+    body.printmode .app{display:none !important}
+    .sheet,.pbar{display:none !important}
+    .printPane{position:static;overflow:visible;padding:0}
+    .psheet{padding:0;max-width:none}
+    .pbox{border-color:#8A8A8A}
+    .phead{color:#000}
+  }
 </style>
 </head>
 <body>
@@ -201,6 +250,7 @@
     <span class="day" id="dayInfo"></span>
     <span class="spacer"></span>
     <button class="linkish hide" id="btnReport">読み込み結果</button>
+    <button class="linkish hide" id="btnPrint">一覧を印刷</button>
     <button class="linkish hide" id="btnClear">一覧を消す</button>
     <button class="linkish" id="btnCsv">CSVを入れ替える</button>
     <button class="linkish" id="btnManual">手入力で出す</button>
@@ -224,6 +274,34 @@
 </div>
 
 <input type="file" id="file" accept=".csv,.tsv,.txt" class="hide">
+
+<!-- 印刷用の一覧 -->
+<div class="printPane hide" id="printPane">
+  <div class="pbar">
+    <h2>患者QR一覧（印刷用）</h2>
+    <label>1行に
+      <select id="pCols">
+        <option value="2">2名（QR大きめ）</option>
+        <option value="3">3名（標準）</option>
+        <option value="4">4名（小さめ）</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="pBlocked"> QRなしの方も載せる</label>
+    <span class="hintline">絞り込みは反映されません。カルテ番号順です。</span>
+    <span class="spacer"></span>
+    <button class="btn" id="pGo">印刷する</button>
+    <button class="btn ghost" id="pClose">閉じる</button>
+  </div>
+  <div class="psheet">
+    <div class="phead">
+      <strong id="pTitle">患者QR一覧</strong>
+      <span id="pDay"></span>
+      <span id="pCount"></span>
+      <span id="pTime"></span>
+    </div>
+    <div class="pgrid" id="pgrid"></div>
+  </div>
+</div>
 
 <!-- column mapping -->
 <div class="sheet hide" id="mapSheet"><div class="inner">
@@ -1021,9 +1099,11 @@ function renderBar(){
     $('dayInfo').textContent = '';
     $('btnReport').classList.add('hide');
     $('btnClear').classList.add('hide');
+    $('btnPrint').classList.add('hide');
     return;
   }
   $('btnClear').classList.remove('hide');
+  $('btnPrint').classList.remove('hide');
   var made = patients.filter(function(p){ return !p.blocked; }).length;
   var blocked = patients.length - made;
   $('dayInfo').textContent =
@@ -1462,14 +1542,106 @@ $('setWipe').addEventListener('click', function(){
   $('setMsg').classList.remove('hide');
 });
 
+// ---------------------------------------------------------------- 印刷用の一覧
+var printCols    = load('printcols', 3);
+var printBlocked = load('printblocked', true);
+
+function printQrSvg(p){
+  var qr = QR.encode(payload(p), { level: settings.level });
+  return QR.toSvg(qr, { scale: 4, quiet: 3 });
+}
+
+function renderPrint(){
+  var grid = $('pgrid');
+  var list = sortById(patients).filter(function(p){ return printBlocked || !p.blocked; });
+  var mm = printCols === 2 ? '42mm' : (printCols === 4 ? '24mm' : '31mm');
+  grid.style.setProperty('--pw', (100 / printCols) + '%');
+  grid.style.setProperty('--qrmm', mm);
+  grid.innerHTML = '';
+
+  if(!list.length){
+    var e = document.createElement('div');
+    e.className = 'pempty';
+    e.textContent = '印刷できる方がいません。';
+    grid.appendChild(e);
+  }
+
+  list.forEach(function(p){
+    var cell = document.createElement('div');
+    cell.className = 'pcell' + (p.blocked ? ' off' : '');
+    var box = document.createElement('div');
+    box.className = 'pbox';
+
+    if(p.blocked){
+      var ph = document.createElement('div');
+      ph.className = 'pnoqr';
+      ph.textContent = 'QRなし';
+      box.appendChild(ph);
+    } else {
+      var holder = document.createElement('div');
+      holder.innerHTML = printQrSvg(p);
+      box.appendChild(holder.firstChild);
+    }
+
+    var r = romaOf(p);
+    var info = document.createElement('div');
+    info.className = 'pinfo';
+    info.innerHTML = '<div class="pid"></div><div class="pnm"></div><div class="prj"></div><div class="pdb"></div>';
+    info.children[0].textContent = p.id;
+    info.children[1].textContent = shownName(p);
+    info.children[2].textContent = p.blocked ? '' : ((r.last || '') + (r.first ? ' ' + r.first : ''));
+    info.children[3].textContent = prettyDob(p.dob) || '生年月日なし';
+    box.appendChild(info);
+
+    cell.appendChild(box);
+    grid.appendChild(cell);
+  });
+
+  var made = list.filter(function(p){ return !p.blocked; }).length;
+  var now = new Date();
+  $('pDay').textContent = (lastReport && lastReport.visit) ? '予約日 ' + lastReport.visit : '';
+  $('pCount').textContent = 'QR ' + made + '名' +
+    (list.length - made ? '　QRなし ' + (list.length - made) + '名' : '');
+  $('pTime').textContent = '出力 ' + now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' +
+    pad2(now.getDate()) + ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+}
+
+function openPrint(){
+  if(!patients.length){ alert('先にCSVを読み込んでください。'); return; }
+  $('pCols').value = String(printCols);
+  $('pBlocked').checked = !!printBlocked;
+  renderPrint();
+  $('printPane').classList.remove('hide');
+  document.body.classList.add('printmode');
+}
+function closePrint(){
+  $('printPane').classList.add('hide');
+  document.body.classList.remove('printmode');
+}
+
+$('btnPrint').addEventListener('click', openPrint);
+$('pClose').addEventListener('click', closePrint);
+$('pGo').addEventListener('click', function(){ window.print(); });
+$('pCols').addEventListener('change', function(){
+  printCols = parseInt(this.value, 10) || 3;
+  save('printcols', printCols);
+  renderPrint();
+});
+$('pBlocked').addEventListener('change', function(){
+  printBlocked = this.checked;
+  save('printblocked', printBlocked);
+  renderPrint();
+});
+
 // ---------------------------------------------------------------- keys
 $('q').addEventListener('input', renderList);
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape'){
     ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet'].forEach(function(id){ $(id).classList.add('hide'); });
+    closePrint();
     return;
   }
-  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet'].some(function(id){
+  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet','printPane'].some(function(id){
     return !$(id).classList.contains('hide');
   });
   if(open) return;
