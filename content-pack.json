@@ -1,0 +1,117 @@
+{
+  "version": "2026.09.3",
+  "reviewed_by": "市田知之",
+  "reviewed_at": "2026-09-07",
+
+  "owner": {
+    "name": "医療法人社団胎児クリニクス",
+    "url": "https://www.fetus-clinics.com/",
+    "year_from": 2026,
+    "rights": "無断転載・無断改変を禁じます。",
+    "note": "このページの文章・計算ロジック・デザインの著作権は上記に帰属します。引用している指針・研究データの著作権は、それぞれの発行元に帰属します。"
+  },
+
+  "default_standard": "jsog2021",
+  "compare_standard": "iom2009",
+
+  "standards": {
+
+    "jsog2021": {
+      "label": "日産婦 2021",
+      "note": "妊娠中の体重増加指導の目安（日本産科婦人科学会 2021年3月）。週ごとの分布は、エコチル調査10万人のデータをもとにした国立成育医療研究センターの体重増加曲線と、IOM 2009 が示す初期増加量から補間しています。",
+      "categories": [
+        {
+          "id": "low", "label": "低体重", "bmi_min": null, "bmi_max": 18.5,
+          "total_low": 12, "total_high": 15, "individual": false,
+          "rate_low": 0.44, "rate_high": 0.58,
+          "anchors": [
+            { "wk": 13, "lo": 0.5, "hi": 2.0,  "src": "IOM 2009" },
+            { "wk": 30, "lo": 8.4, "hi": 11.1, "src": "成育／エコチル" },
+            { "wk": 40, "lo": 12,  "hi": 15,   "src": "日産婦 2021" }
+          ]
+        },
+        {
+          "id": "norm", "label": "普通体重", "bmi_min": 18.5, "bmi_max": 25.0,
+          "total_low": 10, "total_high": 13, "individual": false,
+          "rate_low": 0.35, "rate_high": 0.50,
+          "anchors": [
+            { "wk": 13, "lo": 0.5, "hi": 2.0, "src": "IOM 2009" },
+            { "wk": 30, "lo": 6.4, "hi": 9.1, "src": "成育／エコチル" },
+            { "wk": 40, "lo": 10,  "hi": 13,  "src": "日産婦 2021" }
+          ]
+        },
+        {
+          "id": "ob1", "label": "肥満（1度）", "bmi_min": 25.0, "bmi_max": 30.0,
+          "total_low": 7, "total_high": 10, "individual": false,
+          "rate_low": 0.23, "rate_high": 0.33,
+          "anchors": [
+            { "wk": 13, "lo": 0.5, "hi": 2.0, "src": "IOM 2009" },
+            { "wk": 30, "lo": 3.8, "hi": 6.5, "src": "成育／エコチル" },
+            { "wk": 40, "lo": 7,   "hi": 10,  "src": "日産婦 2021" }
+          ]
+        },
+        {
+          "id": "ob2", "label": "肥満（2度以上）", "bmi_min": 30.0, "bmi_max": null,
+          "total_low": 0, "total_high": 5, "individual": true,
+          "rate_low": 0.17, "rate_high": 0.27,
+          "anchors": [
+            { "wk": 13, "lo": 0, "hi": 1.0, "src": "IOM 2009" },
+            { "wk": 30, "lo": 0, "hi": 1.9, "src": "成育／エコチル（上限のみ）" },
+            { "wk": 40, "lo": 0, "hi": 5,   "src": "日産婦 2021（個別対応）" }
+          ]
+        }
+      ]
+    },
+
+    "iom2009": {
+      "label": "IOM 2009",
+      "note": "米国 Institute of Medicine 2009。初期（〜13週）は0.5〜2kg、以降は妊娠前BMI別の週あたり率で示されています。",
+      "categories": [
+        { "id":"low",  "label":"低体重",         "bmi_min":null, "bmi_max":18.5, "total_low":12.5, "total_high":18,   "individual":false, "rate_low":0.44, "rate_high":0.58,
+          "anchors":[{"wk":13,"lo":0.5,"hi":2.0},{"wk":40,"lo":12.5,"hi":18}] },
+        { "id":"norm", "label":"普通体重",        "bmi_min":18.5, "bmi_max":25.0, "total_low":11.5, "total_high":16,   "individual":false, "rate_low":0.35, "rate_high":0.50,
+          "anchors":[{"wk":13,"lo":0.5,"hi":2.0},{"wk":40,"lo":11.5,"hi":16}] },
+        { "id":"ob1",  "label":"肥満（1度）",     "bmi_min":25.0, "bmi_max":30.0, "total_low":7,    "total_high":11.5, "individual":false, "rate_low":0.23, "rate_high":0.33,
+          "anchors":[{"wk":13,"lo":0.5,"hi":2.0},{"wk":40,"lo":7,"hi":11.5}] },
+        { "id":"ob2",  "label":"肥満（2度以上）", "bmi_min":30.0, "bmi_max":null, "total_low":5,    "total_high":9,    "individual":false, "rate_low":0.17, "rate_high":0.27,
+          "anchors":[{"wk":13,"lo":0.5,"hi":2.0},{"wk":40,"lo":5,"hi":9}] }
+      ]
+    }
+  },
+
+  "checkpoint": {
+    "wk": 30,
+    "label": "30週のめやす",
+    "text": "妊娠30週の時点でこの範囲に入っていれば、40週に日産婦の目安に収まる増え方だと推定されています（エコチル調査10万人のデータより）。"
+  },
+
+  "early_grace_wk": 13,
+
+  "notes": [
+    "体格区分が<b>普通体重</b>で、BMIが低体重に近い場合は目安の上限側に近い範囲、肥満に近い場合は下限側に近い範囲が目安とされています。",
+    "BMIが<b>30以上</b>の場合は、他のリスクも踏まえて個別に対応します。上限5kgまでが一応の目安ですが、必ず担当の医師と相談してください。",
+    "この目安は「増加量を厳格に指導する根拠は必ずしも十分ではない」という前提のもとで、個人差を考慮したゆるやかな指導のために示されたものです。範囲から外れていること自体が異常を意味するわけではありません。",
+    "つわりの時期に体重が減ることは珍しくありません。妊娠13週ごろまでは、このページも増えていないことを指摘しない作りにしています。",
+    "体重の増え方の目安を出身国や人種によって変える根拠は、いまのところ確立していません。妊娠前のBMIで分けたうえで、赤ちゃんの育ち方を超音波で見ながら調整していきます。"
+  ],
+
+  "consult": "次のようなときは、次回を待たずに健診で相談してください。<br>・1週間で体重が2kg以上増えた<br>・むくみが急に強くなった<br>・食事や水分がほとんどとれない日が続く",
+
+  "sources": [
+    { "name": "妊娠中の体重増加指導の目安（日本産科婦人科学会 2021年3月）", "url": "https://www.jsog.or.jp/news/pdf/20210402-2_kourousho.pdf" },
+    { "name": "妊娠中の体重増加曲線（国立成育医療研究センター／エコチル調査 2021年）", "url": "https://www.ncchd.go.jp/press/2021/210928.html" },
+    { "name": "妊娠前からはじめる妊産婦のための食生活指針（厚生労働省 2021年3月改定）", "url": "https://www.cfa.go.jp/assets/contents/node/basic_page/field_ref_resources/a29a9bee-4d29-482d-a63b-5f9cb8ea0aa2/c948c48d/20230401_policies_boshihoken_shokuji_01.pdf" },
+    { "name": "Weight Gain During Pregnancy: Reexamining the Guidelines（IOM 2009）", "url": "https://www.ncbi.nlm.nih.gov/books/NBK32813/" }
+  ],
+
+  "_changelog": [
+    { "version": "2026.09.1", "date": "2026-09-07", "change": "初版。日産婦2021の合計目安から線形補間。" },
+    { "version": "2026.09.2", "date": "2026-09-07", "change": "帯を出典アンカー（IOM 13週／成育30週／日産婦40週）による補間に変更。30週チェックポイント、週あたりペース判定、IOM 2009の比較表示を追加。" },
+    { "version": "2026.09.3", "date": "2026-09-07", "change": "著作権表示を追加。owner ブロックで法人名を差し替え可能に。" }
+  ],
+
+  "_todo": [
+    "成育医療研究センターが公開している体重増加曲線から週別の値を読み取り、anchors を週単位の完全なテーブルに置き換えると補間が不要になる。",
+    "中国 WS/T 801-2022 は原文未確認のため未収載。確認後 standards に追加可能。"
+  ]
+}

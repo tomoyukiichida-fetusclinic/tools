@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<!--
+  妊娠中の体重増加の目安
+  Copyright (c) 2026 医療法人社団胎児クリニクス  All rights reserved.
+  無断転載・無断改変を禁じます。
+  ※ 著作権者名は content-pack.json の owner で差し替えられます。
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="author" content="医療法人社団胎児クリニクス">
+<meta name="copyright" content="Copyright (c) 2026 医療法人社団胎児クリニクス">
+<title>妊娠中の体重増加の目安</title>
+<style>
+  :root{
+    --bg:#F5F7F6; --surface:#FFFFFF;
+    --ink:#18211F; --ink-2:#5A6A65; --ink-3:#8A9793;
+    --teal:#0E4F4B; --teal-mid:#2E7C74;
+    --band:#D3E5E1; --band-line:#8FC0B8;
+    --rule:#E2E7E5; --ochre:#8A6A2F; --cmp:#A9B6B2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic Medium","Yu Gothic",Meiryo,system-ui,sans-serif;
+    font-size:16px; line-height:1.75; -webkit-text-size-adjust:100%;
+    font-feature-settings:"palt" 1;
+  }
+  .wrap{max-width:540px;margin:0 auto;padding:28px 20px 64px}
+  h1{font-size:1.35rem;font-weight:600;line-height:1.5;margin:0 0 6px}
+  .lede{color:var(--ink-2);font-size:.9rem;margin:0 0 28px}
+  .privacy{display:inline-block;font-size:.76rem;color:var(--teal-mid);
+    border:1px solid var(--band-line);border-radius:100px;padding:3px 11px;margin-bottom:16px}
+
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:20px;margin-bottom:18px}
+  h2{font-size:.95rem;font-weight:600;margin:0 0 14px;color:var(--teal)}
+
+  .field{margin-bottom:14px}
+  label{display:block;font-size:.82rem;color:var(--ink-2);margin-bottom:5px}
+  .inrow{display:flex;align-items:baseline;gap:8px}
+  input[type=number]{flex:1;min-width:0;font:inherit;font-variant-numeric:tabular-nums;
+    padding:10px 12px;border:1px solid var(--rule);border-radius:9px;background:#FBFCFC;color:var(--ink)}
+  input[type=number]:focus{outline:2px solid var(--teal-mid);outline-offset:1px;background:#fff}
+  .unit{font-size:.85rem;color:var(--ink-3);flex:0 0 auto}
+  .pair{display:flex;gap:12px}
+  .pair>.field{flex:1;margin-bottom:0}
+
+  button{font:inherit;font-weight:600;border:none;border-radius:9px;padding:11px 16px;
+    background:var(--teal);color:#fff;cursor:pointer}
+  button:hover{background:var(--teal-mid)}
+  button:focus-visible{outline:2px solid var(--teal-mid);outline-offset:2px}
+  button.quiet{background:transparent;color:var(--ink-2);font-weight:400;font-size:.82rem;padding:6px 8px}
+  button.quiet:hover{background:#EEF2F1;color:var(--ink)}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:16px}
+
+  #result{display:none}
+  .figure{display:flex;gap:24px;flex-wrap:wrap;padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--rule)}
+  .fig-k{font-size:.78rem;color:var(--ink-3);margin-bottom:2px}
+  .fig-v{font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+  .fig-v small{font-size:.8rem;font-weight:400;color:var(--ink-2);margin-left:3px}
+  .fig-v.txt{font-size:1.15rem}
+
+  .verdict{font-size:.95rem;margin:0 0 4px}
+  .verdict-sub{font-size:.85rem;color:var(--ink-2);margin:0}
+  .pace{font-size:.87rem;color:var(--ink-2);margin:12px 0 0;padding-top:12px;border-top:1px solid var(--rule)}
+  .pace b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+  svg{display:block;width:100%;height:auto;margin:6px 0 8px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.76rem;color:var(--ink-2);margin:0 0 10px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:16px;height:0;border-top:3px solid var(--band-line);flex:0 0 auto}
+  .sw.solid{border-top:3px solid var(--teal)}
+  .sw.dash{border-top:2px dashed var(--cmp)}
+  .chart-note{font-size:.76rem;color:var(--ink-3);line-height:1.65;margin:0}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--ink-2);margin:12px 0 0;cursor:pointer}
+  .toggle input{width:16px;height:16px;accent-color:var(--teal)}
+
+  .checkpoint{background:#EEF5F3;border-radius:10px;padding:14px 16px;margin:16px 0 0}
+  .checkpoint .cp-k{font-size:.78rem;color:var(--teal-mid);margin-bottom:3px}
+  .checkpoint .cp-v{font-size:1.05rem;font-weight:600;font-variant-numeric:tabular-nums;margin-bottom:6px}
+  .checkpoint p{font-size:.82rem;color:var(--ink-2);margin:0;line-height:1.65}
+
+  table{width:100%;border-collapse:collapse;font-size:.88rem;font-variant-numeric:tabular-nums}
+  th{text-align:left;font-weight:400;font-size:.76rem;color:var(--ink-3);padding-bottom:6px;border-bottom:1px solid var(--rule)}
+  td{padding:8px 0;border-bottom:1px solid var(--rule)}
+  td:last-child{text-align:right}
+  .del{background:none;border:none;color:var(--ink-3);cursor:pointer;font-size:.85rem;padding:2px 6px;font-weight:400}
+  .del:hover{color:var(--ink)}
+
+  .note{font-size:.84rem;color:var(--ink-2);line-height:1.7;padding-left:12px;
+    border-left:2px solid var(--band-line);margin:0 0 12px}
+  .note:last-child{margin-bottom:0}
+  .note b{font-weight:600;color:var(--ink)}
+  .consult{background:#FAF6EE;border:1px solid #EADFC8;border-radius:10px;padding:12px 14px;
+    font-size:.86rem;color:var(--ochre);line-height:1.7}
+  footer{font-size:.76rem;color:var(--ink-3);line-height:1.8;margin-top:28px}
+  footer a{color:var(--ink-2)}
+  footer ul{margin:6px 0 0;padding-left:1.1em}
+  .copyright{margin-top:20px;padding-top:14px;border-top:1px solid var(--rule);
+    font-size:.74rem;color:var(--ink-3);line-height:1.7}
+  .copyright strong{font-weight:600;color:var(--ink-2)}
+  @media (prefers-reduced-motion:no-preference){
+    #result[data-shown]{animation:in .28s ease-out}
+    @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="privacy">入力した内容はこの端末の中だけに保存されます</span>
+  <h1>妊娠中の体重増加の目安</h1>
+  <p class="lede">妊娠前の体格から、出産までに増える体重の目安と、いまの増え方のペースを表示します。増え方には個人差があります。</p>
+
+  <div class="panel">
+    <h2>あなたの情報</h2>
+    <div class="pair">
+      <div class="field">
+        <label for="h">身長</label>
+        <div class="inrow"><input type="number" id="h" inputmode="decimal" step="0.1" min="120" max="200" placeholder="158"><span class="unit">cm</span></div>
+      </div>
+      <div class="field">
+        <label for="pw">妊娠前の体重</label>
+        <div class="inrow"><input type="number" id="pw" inputmode="decimal" step="0.1" min="30" max="150" placeholder="52.0"><span class="unit">kg</span></div>
+      </div>
+    </div>
+    <div class="pair" style="margin-top:14px">
+      <div class="field">
+        <label for="wk">いまの妊娠週数</label>
+        <div class="inrow"><input type="number" id="wk" inputmode="numeric" step="1" min="0" max="42" placeholder="24"><span class="unit">週</span></div>
+      </div>
+      <div class="field">
+        <label for="cw">いまの体重</label>
+        <div class="inrow"><input type="number" id="cw" inputmode="decimal" step="0.1" min="30" max="180" placeholder="56.0"><span class="unit">kg</span></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="calc">計算して記録する</button>
+      <button class="quiet" id="clear">入力と記録をすべて消す</button>
+    </div>
+  </div>
+
+  <div class="panel" id="result">
+    <h2>結果</h2>
+    <div class="figure">
+      <div><div class="fig-k">妊娠前のBMI</div><div class="fig-v" id="o-bmi">—</div></div>
+      <div><div class="fig-k">体格区分</div><div class="fig-v txt" id="o-cat">—</div></div>
+      <div><div class="fig-k">出産までの目安</div><div class="fig-v" id="o-range">—</div></div>
+    </div>
+    <p class="verdict" id="o-verdict"></p>
+    <p class="verdict-sub" id="o-verdict-sub"></p>
+    <p class="pace" id="o-pace" style="display:none"></p>
+
+    <div class="checkpoint" id="o-cp" style="display:none">
+      <div class="cp-k" id="cp-k"></div>
+      <div class="cp-v" id="cp-v"></div>
+      <p id="cp-t"></p>
+    </div>
+
+    <svg id="chart" viewBox="0 0 360 250" role="img" aria-labelledby="ct"><title id="ct">妊娠週数と体重増加量のグラフ</title></svg>
+    <div class="legend" id="legend"></div>
+    <p class="chart-note" id="chart-note"></p>
+    <label class="toggle"><input type="checkbox" id="cmp"> 別の基準（<span id="cmp-name"></span>）の範囲も重ねて表示する</label>
+  </div>
+
+  <div class="panel" id="logpanel" style="display:none">
+    <h2>記録</h2>
+    <div id="logbody"></div>
+  </div>
+
+  <div class="panel">
+    <h2>目安を読むときに</h2>
+    <div id="notes"></div>
+  </div>
+
+  <div class="panel" style="border-color:#EADFC8;background:#FDFBF6">
+    <div class="consult" id="consult"></div>
+  </div>
+
+  <footer>
+    <div id="src"></div>
+    <p style="margin-top:14px">このページは一般的な情報を計算して表示するもので、診断や治療の判断を行うものではありません。気になることは健診で担当の医師・助産師にご相談ください。</p>
+    <div class="copyright" id="copyright"></div>
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   コンテンツパック（内蔵版 = フォールバック）
+   同じフォルダの content-pack.json があればそちらを優先。
+   通信は GET のみ。入力内容が端末外に出る経路はありません。
+   ============================================================ */
+const FALLBACK = {
+  version:"2026.09.3", reviewed_by:"市田知之", reviewed_at:"2026-09-07",
+  owner:{
+    name:"医療法人社団胎児クリニクス",
+    url:"https://www.fetus-clinics.com/",
+    year_from:2026,
+    rights:"無断転載・無断改変を禁じます。",
+    note:"このページの文章・計算ロジック・デザインの著作権は上記に帰属します。引用している指針・研究データの著作権は、それぞれの発行元に帰属します。"
+  },
+  default_standard:"jsog2021", compare_standard:"iom2009",
+  early_grace_wk:13,
+  standards:{
+    jsog2021:{
+      label:"日産婦 2021",
+      note:"日本産科婦人科学会2021年3月の目安。週ごとの分布は、エコチル調査10万人をもとにした国立成育医療研究センターの体重増加曲線と、IOM 2009の初期増加量から補間しています。",
+      categories:[
+        {id:"low", label:"低体重", bmi_min:null,bmi_max:18.5, total_low:12,total_high:15, individual:false, rate_low:0.44,rate_high:0.58,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:30,lo:8.4,hi:11.1},{wk:40,lo:12,hi:15}]},
+        {id:"norm",label:"普通体重", bmi_min:18.5,bmi_max:25.0, total_low:10,total_high:13, individual:false, rate_low:0.35,rate_high:0.50,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:30,lo:6.4,hi:9.1},{wk:40,lo:10,hi:13}]},
+        {id:"ob1", label:"肥満（1度）", bmi_min:25.0,bmi_max:30.0, total_low:7,total_high:10, individual:false, rate_low:0.23,rate_high:0.33,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:30,lo:3.8,hi:6.5},{wk:40,lo:7,hi:10}]},
+        {id:"ob2", label:"肥満（2度以上）", bmi_min:30.0,bmi_max:null, total_low:0,total_high:5, individual:true, rate_low:0.17,rate_high:0.27,
+         anchors:[{wk:13,lo:0,hi:1.0},{wk:30,lo:0,hi:1.9},{wk:40,lo:0,hi:5}]}
+      ]},
+    iom2009:{
+      label:"IOM 2009",
+      note:"米国 Institute of Medicine 2009。初期は0.5〜2kg、以降は妊娠前BMI別の週あたり率で示されています。",
+      categories:[
+        {id:"low", label:"低体重", bmi_min:null,bmi_max:18.5, total_low:12.5,total_high:18, individual:false, rate_low:0.44,rate_high:0.58,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:40,lo:12.5,hi:18}]},
+        {id:"norm",label:"普通体重", bmi_min:18.5,bmi_max:25.0, total_low:11.5,total_high:16, individual:false, rate_low:0.35,rate_high:0.50,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:40,lo:11.5,hi:16}]},
+        {id:"ob1", label:"肥満（1度）", bmi_min:25.0,bmi_max:30.0, total_low:7,total_high:11.5, individual:false, rate_low:0.23,rate_high:0.33,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:40,lo:7,hi:11.5}]},
+        {id:"ob2", label:"肥満（2度以上）", bmi_min:30.0,bmi_max:null, total_low:5,total_high:9, individual:false, rate_low:0.17,rate_high:0.27,
+         anchors:[{wk:13,lo:0.5,hi:2.0},{wk:40,lo:5,hi:9}]}
+      ]}
+  },
+  checkpoint:{wk:30,label:"30週のめやす",
+    text:"妊娠30週の時点でこの範囲に入っていれば、40週に日産婦の目安に収まる増え方だと推定されています（エコチル調査10万人のデータより）。"},
+  notes:[
+    "体格区分が<b>普通体重</b>で、BMIが低体重に近い場合は目安の上限側に近い範囲、肥満に近い場合は下限側に近い範囲が目安とされています。",
+    "BMIが<b>30以上</b>の場合は、他のリスクも踏まえて個別に対応します。上限5kgまでが一応の目安ですが、必ず担当の医師と相談してください。",
+    "この目安は「増加量を厳格に指導する根拠は必ずしも十分ではない」という前提のもとで、個人差を考慮したゆるやかな指導のために示されたものです。範囲から外れていること自体が異常を意味するわけではありません。",
+    "つわりの時期に体重が減ることは珍しくありません。妊娠13週ごろまでは、このページも増えていないことを指摘しない作りにしています。",
+    "体重の増え方の目安を出身国や人種によって変える根拠は、いまのところ確立していません。妊娠前のBMIで分けたうえで、赤ちゃんの育ち方を超音波で見ながら調整していきます。"
+  ],
+  consult:"次のようなときは、次回を待たずに健診で相談してください。<br>・1週間で体重が2kg以上増えた<br>・むくみが急に強くなった<br>・食事や水分がほとんどとれない日が続く",
+  sources:[
+    {name:"妊娠中の体重増加指導の目安（日本産科婦人科学会 2021年3月）",url:"https://www.jsog.or.jp/news/pdf/20210402-2_kourousho.pdf"},
+    {name:"妊娠中の体重増加曲線（国立成育医療研究センター／エコチル調査 2021年）",url:"https://www.ncchd.go.jp/press/2021/210928.html"},
+    {name:"妊娠前からはじめる妊産婦のための食生活指針（厚生労働省 2021年3月改定）",url:"https://www.nibn.go.jp/eiken/ninsanpu/weightgain.html"},
+    {name:"Weight Gain During Pregnancy: Reexamining the Guidelines（IOM 2009）",url:"https://www.ncbi.nlm.nih.gov/books/NBK32813/"}
+  ]
+};
+
+let C = FALLBACK, STD, CMP;
+const KEY = "pw-weight-v2", TERM = 40;
+const $ = id => document.getElementById(id);
+
+async function loadPack(){
+  try{
+    const r = await fetch("content-pack.json",{cache:"no-cache"});
+    if(!r.ok) return;
+    const j = await r.json();
+    if(j && j.standards && j.default_standard && j.standards[j.default_standard]) C = j;
+  }catch(e){}
+}
+
+let state = { h:null, pw:null, log:[], cmp:false };
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if(s && typeof s === "object"){ state = Object.assign(state, s); state.log = state.log || []; }
+  }catch(e){}
+}
+
+/* ---------- 計算 ---------- */
+const bmiOf = (h,w) => w/((h/100)*(h/100));
+function categoryOf(bmi, std){
+  return std.categories.find(c =>
+    (c.bmi_min === null || bmi >= c.bmi_min) &&
+    (c.bmi_max === null || bmi <  c.bmi_max)) || std.categories[std.categories.length-1];
+}
+// アンカー点（週・下限・上限）を通る折れ線。0週は 0,0 とする。
+function bandAt(w, cat){
+  const a = [{wk:0,lo:0,hi:0}].concat(cat.anchors).sort((x,y)=>x.wk-y.wk);
+  w = Math.max(0, Math.min(a[a.length-1].wk, w));
+  for(let i=1;i<a.length;i++){
+    if(w <= a[i].wk){
+      const p=a[i-1], q=a[i], t=(w-p.wk)/(q.wk-p.wk);
+      return { lo:p.lo+(q.lo-p.lo)*t, hi:p.hi+(q.hi-p.hi)*t };
+    }
+  }
+  return { lo:a[a.length-1].lo, hi:a[a.length-1].hi };
+}
+
+/* ---------- 描画 ---------- */
+const W=360,H=250,ML=34,MR=10,MT=12,MB=30;
+function bandPts(cat, x, y){
+  const up=[],dn=[];
+  for(let w=0;w<=TERM;w++){ const b=bandAt(w,cat); up.push(`${x(w).toFixed(1)},${y(b.hi).toFixed(1)}`); dn.push(`${x(w).toFixed(1)},${y(b.lo).toFixed(1)}`); }
+  return {up,dn};
+}
+function drawChart(cat, cmpCat){
+  const pts = state.log.slice().sort((a,b)=>a.wk-b.wk);
+  const gains = pts.map(p=>p.gain);
+  const top = cmpCat ? Math.max(cat.total_high, cmpCat.total_high) : cat.total_high;
+  const yMax = Math.max(top+2, ...gains.map(g=>g+1.5), 8);
+  const yMin = Math.min(-3, ...gains.map(g=>g-1.5));
+  const x = w => ML + (w/TERM)*(W-ML-MR);
+  const y = v => MT + (1-(v-yMin)/(yMax-yMin))*(H-MT-MB);
+  let s = "";
+
+  const step = (yMax-yMin) > 18 ? 5 : 2;
+  for(let v=Math.ceil(yMin/step)*step; v<=yMax; v+=step){
+    const yy=y(v).toFixed(1);
+    s+=`<line x1="${ML}" y1="${yy}" x2="${W-MR}" y2="${yy}" stroke="${v===0?'#B9C4C1':'#EDF1F0'}" stroke-width="1"/>`;
+    s+=`<text x="${ML-6}" y="${(+yy+4).toFixed(1)}" text-anchor="end" font-size="9" fill="#8A9793">${v}</text>`;
+  }
+  [0,10,20,30,40].forEach(w=>{
+    s+=`<line x1="${x(w).toFixed(1)}" y1="${MT}" x2="${x(w).toFixed(1)}" y2="${H-MB}" stroke="#EDF1F0" stroke-width="1"/>`;
+    s+=`<text x="${x(w).toFixed(1)}" y="${H-MB+15}" text-anchor="middle" font-size="9" fill="#8A9793">${w}週</text>`;
+  });
+  s+=`<text x="${ML-6}" y="${MT+4}" text-anchor="end" font-size="9" fill="#8A9793">kg</text>`;
+
+  // 比較基準（破線）
+  if(cmpCat){
+    const c = bandPts(cmpCat, x, y);
+    s+=`<polyline points="${c.up.join(" ")}" fill="none" stroke="var(--cmp)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+    s+=`<polyline points="${c.dn.join(" ")}" fill="none" stroke="var(--cmp)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  }
+  // 主基準（帯）
+  const b = bandPts(cat, x, y);
+  s+=`<polygon points="${b.up.join(" ")} ${b.dn.slice().reverse().join(" ")}" fill="var(--band)" opacity="0.75"/>`;
+  s+=`<polyline points="${b.up.join(" ")}" fill="none" stroke="var(--band-line)" stroke-width="1.4"/>`;
+  s+=`<polyline points="${b.dn.join(" ")}" fill="none" stroke="var(--band-line)" stroke-width="1.4"/>`;
+
+  // 30週チェックポイント
+  const cw = (C.checkpoint && C.checkpoint.wk) || 30;
+  s+=`<line x1="${x(cw).toFixed(1)}" y1="${MT}" x2="${x(cw).toFixed(1)}" y2="${H-MB}" stroke="var(--teal-mid)" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>`;
+
+  if(pts.length>1)
+    s+=`<polyline points="${pts.map(p=>`${x(p.wk).toFixed(1)},${y(p.gain).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--teal)" stroke-width="1.8" stroke-linejoin="round"/>`;
+  pts.forEach((p,i)=>{
+    const last = i===pts.length-1;
+    s+=`<circle cx="${x(p.wk).toFixed(1)}" cy="${y(p.gain).toFixed(1)}" r="${last?5:3.2}" fill="${last?'var(--teal)':'#fff'}" stroke="var(--teal)" stroke-width="1.8"/>`;
+  });
+  $("chart").innerHTML = `<title id="ct">妊娠週数と体重増加量のグラフ</title>`+s;
+}
+
+/* ---------- 出力 ---------- */
+function render(){
+  if(!state.h || !state.pw || !state.log.length){ $("result").style.display="none"; $("logpanel").style.display="none"; return; }
+
+  const bmi = bmiOf(state.h, state.pw);
+  const cat = categoryOf(bmi, STD);
+  const cmpCat = (state.cmp && CMP) ? categoryOf(bmi, CMP) : null;
+  const pts = state.log.slice().sort((a,b)=>a.wk-b.wk);
+  const latest = pts[pts.length-1];
+  const b = bandAt(latest.wk, cat);
+  const grace = C.early_grace_wk || 13;
+
+  $("o-bmi").textContent = bmi.toFixed(1);
+  $("o-cat").textContent = cat.label;
+  $("o-range").innerHTML = cat.individual ? `個別対応<small>上限5kg目安</small>`
+    : `${cat.total_low}–${cat.total_high}<small>kg</small>`;
+
+  const g = latest.gain, sign = g>=0?"+":"−";
+  const base = `${latest.wk}週の時点で、妊娠前より <b>${sign}${Math.abs(g).toFixed(1)}kg</b> です。`;
+  let msg, sub;
+  if(cat.individual){
+    msg = base;
+    sub = "BMIが30以上のため、帯はあくまで参考です。増え方は担当の医師と個別に相談してください。";
+  }else if(latest.wk <= grace){
+    msg = base;
+    sub = "妊娠初期はつわりなどで増えなかったり減ったりすることがよくあります。この時期は増え方を評価しません。";
+  }else if(g < b.lo-0.05){
+    msg = base + " この週数の目安の帯より下にあります。";
+    sub = "増えにくい状態が続く場合は、健診で食事の内容を一緒に見直します。赤ちゃんの育ち方は超音波でも確認します。";
+  }else if(g > b.hi+0.05){
+    msg = base + " この週数の目安の帯より上にあります。";
+    sub = "帯を超えること自体が異常というわけではありません。ここからの増え方のペースを健診で確認しましょう。";
+  }else{
+    msg = base + " この週数の目安の帯の中にあります。";
+    sub = "このペースで健診を続けてください。";
+  }
+  $("o-verdict").innerHTML = msg;
+  $("o-verdict-sub").textContent = sub;
+
+  // 週あたりのペース（直近2点、中期以降のみ）
+  // 判定は帯そのものの傾きから算出する。別基準の週あたり率を混ぜると食い違うため。
+  const pe = $("o-pace");
+  const prev = pts.length>1 ? pts[pts.length-2] : null;
+  if(prev && latest.wk > grace && latest.wk - prev.wk >= 2 && !cat.individual){
+    const dw = latest.wk - prev.wk;
+    const pb = bandAt(prev.wk, cat);
+    const rate  = (latest.gain - prev.gain)/dw;
+    const rLo   = (b.lo - pb.lo)/dw;
+    const rHi   = (b.hi - pb.hi)/dw;
+    let judge;
+    if(rate < rLo - 0.005)      judge = "目安のペースよりゆっくりです。";
+    else if(rate > rHi + 0.005) judge = "目安のペースより速めです。";
+    else                        judge = "目安のペースの中です。";
+    pe.innerHTML = `直近の増え方は <b>週 ${rate.toFixed(2)} kg</b>（${prev.wk}週 → ${latest.wk}週）。`
+      + `この時期の目安は週 <b>${rLo.toFixed(2)}〜${rHi.toFixed(2)} kg</b> です。${judge}`;
+    pe.style.display = "block";
+  }else pe.style.display = "none";
+
+  // 30週チェックポイント
+  const cp = C.checkpoint, cpEl = $("o-cp");
+  if(cp && !cat.individual && latest.wk >= cp.wk - 4){
+    const cb = bandAt(cp.wk, cat);
+    $("cp-k").textContent = cp.label;
+    $("cp-v").textContent = `${cb.lo.toFixed(1)} 〜 ${cb.hi.toFixed(1)} kg`;
+    $("cp-t").textContent = cp.text;
+    cpEl.style.display = "block";
+  }else cpEl.style.display = "none";
+
+  drawChart(cat, cmpCat);
+  $("legend").innerHTML =
+    `<span><i class="sw"></i>${STD.label} の目安</span>`
+    + (cmpCat ? `<span><i class="sw dash"></i>${CMP.label}</span>` : "")
+    + `<span><i class="sw solid"></i>あなたの記録</span>`;
+  $("chart-note").innerHTML = STD.note
+    + " 学会が示しているのは出産までの<b>合計</b>の目安で、週ごとの基準そのものではありません。";
+
+  $("result").style.display="block";
+  $("result").setAttribute("data-shown","1");
+  renderLog();
+}
+
+function renderLog(){
+  const pts = state.log.slice().sort((a,b)=>a.wk-b.wk);
+  if(!pts.length){ $("logpanel").style.display="none"; return; }
+  $("logpanel").style.display="block";
+  let t = `<table><thead><tr><th>週数</th><th>体重</th><th>増減</th><th></th></tr></thead><tbody>`;
+  pts.forEach(p=>{
+    const s = p.gain>=0?"+":"−";
+    t += `<tr><td>${p.wk}週</td><td>${p.w.toFixed(1)} kg</td><td>${s}${Math.abs(p.gain).toFixed(1)} kg</td>
+          <td><button class="del" data-wk="${p.wk}" aria-label="${p.wk}週の記録を消す">消す</button></td></tr>`;
+  });
+  $("logbody").innerHTML = t + `</tbody></table>`;
+  $("logbody").querySelectorAll(".del").forEach(btn=>{
+    btn.onclick = () => { state.log = state.log.filter(p=>p.wk !== +btn.dataset.wk); save(); render(); };
+  });
+}
+
+function renderStatic(){
+  $("notes").innerHTML = C.notes.map(n=>`<p class="note">${n}</p>`).join("");
+  $("consult").innerHTML = C.consult;
+  $("cmp-name").textContent = CMP ? CMP.label : "—";
+  if(!CMP) document.querySelector(".toggle").style.display = "none";
+  $("src").innerHTML = `情報の出典<ul>`
+    + C.sources.map(s=>`<li><a href="${s.url}" target="_blank" rel="noopener">${s.name}</a></li>`).join("")
+    + `</ul><p style="margin-top:10px">内容更新 ${C.reviewed_at}（確認：${C.reviewed_by}）／ 版 ${C.version}</p>`;
+
+  const o = C.owner;
+  if(o && o.name){
+    const now = new Date().getFullYear();
+    const span = (o.year_from && o.year_from < now) ? `${o.year_from}–${now}` : (o.year_from || now);
+    const who = o.url
+      ? `<a href="${o.url}" target="_blank" rel="noopener">${o.name}</a>`
+      : o.name;
+    $("copyright").innerHTML =
+      `<strong>© ${span} ${who}</strong>`
+      + (o.rights ? `　${o.rights}` : "")
+      + (o.note ? `<br>${o.note}` : "");
+  }else $("copyright").style.display = "none";
+}
+
+/* ---------- 操作 ---------- */
+$("calc").onclick = () => {
+  const h=parseFloat($("h").value), pw=parseFloat($("pw").value);
+  const wk=parseInt($("wk").value,10), cw=parseFloat($("cw").value);
+  if(!(h>0 && pw>0 && cw>0) || !(wk>=0 && wk<=42)){
+    $("o-verdict").textContent = "身長・妊娠前の体重・妊娠週数・いまの体重をすべて入力してください。";
+    $("o-verdict-sub").textContent = ""; $("o-pace").style.display="none"; $("o-cp").style.display="none";
+    $("result").style.display="block"; return;
+  }
+  state.h=h; state.pw=pw;
+  state.log = state.log.filter(p=>p.wk!==wk);
+  state.log.push({wk, w:cw, gain:+(cw-pw).toFixed(1)});
+  save(); render();
+  $("result").scrollIntoView({behavior:"smooth", block:"start"});
+};
+
+$("cmp").onchange = e => { state.cmp = e.target.checked; save(); render(); };
+
+$("clear").onclick = () => {
+  if(!confirm("入力と記録をすべて消します。よろしいですか。")) return;
+  state = {h:null,pw:null,log:[],cmp:false};
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  ["h","pw","wk","cw"].forEach(id=>$(id).value="");
+  $("cmp").checked=false;
+  $("result").style.display="none"; $("logpanel").style.display="none";
+};
+
+/* ---------- 起動 ---------- */
+(async () => {
+  load();
+  await loadPack();
+  STD = C.standards[C.default_standard];
+  CMP = C.compare_standard ? C.standards[C.compare_standard] : null;
+  renderStatic();
+  if(state.h) $("h").value = state.h;
+  if(state.pw) $("pw").value = state.pw;
+  $("cmp").checked = !!state.cmp;
+  render();
+})();
+</script>
+</body>
+</html>
