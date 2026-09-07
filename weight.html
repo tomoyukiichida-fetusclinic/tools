@@ -90,6 +90,12 @@
   .del{background:none;border:none;color:var(--ink-3);cursor:pointer;font-size:.85rem;padding:2px 6px;font-weight:400}
   .del:hover{color:var(--ink)}
 
+  .help{font-size:.82rem;color:var(--ink-2);line-height:1.7;margin:0 0 12px}
+  textarea{width:100%;font:inherit;font-size:.82rem;line-height:1.5;padding:10px 12px;
+    border:1px solid var(--rule);border-radius:9px;background:#FBFCFC;color:var(--ink);resize:vertical;
+    word-break:break-all;overflow-wrap:anywhere}
+  textarea:focus{outline:2px solid var(--teal-mid);outline-offset:1px;background:#fff}
+  #exptext{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.76rem;margin-top:12px}
   .note{font-size:.84rem;color:var(--ink-2);line-height:1.7;padding-left:12px;
     border-left:2px solid var(--band-line);margin:0 0 12px}
   .note:last-child{margin-bottom:0}
@@ -169,6 +175,25 @@
   <div class="panel" id="logpanel" style="display:none">
     <h2>記録</h2>
     <div id="logbody"></div>
+  </div>
+
+  <div class="panel" id="backup">
+    <h2>記録の控え（機種変更・別の端末で続けるとき）</h2>
+    <p class="help">記録はこの端末の中だけに保存されていて、どこにも送られません。そのため、スマートフォンを買い替えたり、別の端末で続けたりするときは、ここで「控えのコード」を作ってメモアプリなどに貼っておき、新しい端末でこのページを開いて読み込んでください。</p>
+    <div class="actions"><button id="exp">控えのコードを作る</button></div>
+    <div id="expbox" style="display:none">
+      <textarea id="exptext" readonly rows="4" aria-label="控えのコード"></textarea>
+      <div class="actions">
+        <button id="copy">コピーする</button>
+        <button class="quiet" id="share" style="display:none">共有…</button>
+        <span class="help" id="copymsg" style="margin:0"></span>
+      </div>
+    </div>
+    <div class="field" style="margin-top:20px">
+      <label for="imptext">控えのコードを貼り付けて読み込む</label>
+      <textarea id="imptext" rows="3" placeholder="PW1. で始まるコード"></textarea>
+    </div>
+    <div class="actions"><button id="imp">読み込む</button><span class="help" id="impmsg" style="margin:0"></span></div>
   </div>
 
   <div class="panel">
@@ -491,7 +516,66 @@ $("clear").onclick = () => {
   try{ localStorage.removeItem(KEY); }catch(e){}
   ["h","pw","wk","cw"].forEach(id=>$(id).value="");
   $("cmp").checked=false;
+  $("expbox").style.display="none"; $("exptext").value="";
   $("result").style.display="none"; $("logpanel").style.display="none";
+};
+
+/* ---------- 記録の控え（書き出し／読み込み） ----------
+   端末内の記録を「PW1.」で始まる文字列にして、利用者自身がメモ等に控える。
+   サーバーには送らない。読み込みは同じ形式の文字列のみ受け付ける。 */
+const CODE_PREFIX = "PW1.";
+const b64u   = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const unb64u = s => { s = s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s += "="; return decodeURIComponent(escape(atob(s))); };
+
+function exportCode(){
+  const d = { v:1, h:state.h, pw:state.pw, log:state.log, at:new Date().toISOString().slice(0,10) };
+  return CODE_PREFIX + b64u(JSON.stringify(d));
+}
+function parseCode(text){
+  let t = (text||"").replace(/\s+/g,"");
+  if(!t) throw new Error("コードが空です。");
+  if(!t.startsWith(CODE_PREFIX)) throw new Error("このページで作った控えのコード（PW1. で始まるもの）ではないようです。");
+  let d;
+  try{ d = JSON.parse(unb64u(t.slice(CODE_PREFIX.length))); }
+  catch(e){ throw new Error("コードを読み取れませんでした。途中で切れていないか確認してください。"); }
+  const num = (v,lo,hi) => typeof v === "number" && isFinite(v) && v >= lo && v <= hi;
+  if(!d || d.v !== 1 || !num(d.h,100,220) || !num(d.pw,20,200) || !Array.isArray(d.log))
+    throw new Error("コードの内容が正しくありません。");
+  const log = d.log.filter(p => p && num(p.wk,0,42) && num(p.w,20,250))
+                   .map(p => ({ wk:Math.round(p.wk), w:+p.w, gain:+(p.w - d.pw).toFixed(1) }));
+  return { h:d.h, pw:d.pw, log };
+}
+function setMsg(id, text){ const el = $(id); el.textContent = text; if(text) setTimeout(()=>{ if(el.textContent===text) el.textContent=""; }, 6000); }
+
+$("exp").onclick = () => {
+  if(!state.h || !state.pw || !state.log.length){ setMsg("copymsg","まだ記録がありません。"); $("expbox").style.display="block"; $("exptext").value=""; return; }
+  $("exptext").value = exportCode();
+  $("expbox").style.display = "block";
+  $("share").style.display = (navigator.share ? "inline-block" : "none");
+  setMsg("copymsg","");
+};
+$("copy").onclick = async () => {
+  const t = $("exptext").value; if(!t) return;
+  try{ await navigator.clipboard.writeText(t); setMsg("copymsg","コピーしました。メモアプリなどに貼り付けて保存してください。"); }
+  catch(e){ $("exptext").select(); try{ document.execCommand("copy"); setMsg("copymsg","コピーしました。"); }catch(e2){ setMsg("copymsg","長押しして選択し、コピーしてください。"); } }
+};
+$("share").onclick = async () => {
+  const t = $("exptext").value; if(!t) return;
+  try{ await navigator.share({ title:"体重記録の控え", text:t }); }catch(e){}
+};
+$("imp").onclick = () => {
+  let d;
+  try{ d = parseCode($("imptext").value); }
+  catch(e){ setMsg("impmsg", e.message); return; }
+  const has = state.log.length > 0;
+  if(has && !confirm(`いまの端末に ${state.log.length} 件の記録があります。控えの記録と合わせて読み込みます（同じ週は控えの値で上書き）。よろしいですか。`)) return;
+  const merged = state.log.filter(p => !d.log.some(q => q.wk === p.wk)).concat(d.log)
+                   .map(p => ({ wk:p.wk, w:p.w, gain:+(p.w - d.pw).toFixed(1) }));
+  state.h = d.h; state.pw = d.pw; state.log = merged;
+  save(); render();
+  $("h").value = state.h; $("pw").value = state.pw; $("imptext").value = "";
+  setMsg("impmsg", `${d.log.length} 件の記録を読み込みました。`);
+  if(state.log.length) $("result").scrollIntoView({behavior:"smooth", block:"start"});
 };
 
 /* ---------- 起動 ---------- */
