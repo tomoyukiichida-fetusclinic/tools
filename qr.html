@@ -230,6 +230,32 @@
   .pcell.off .pbox{background:#F6F7F8}
   .pempty{font-size:14px;color:var(--dim);padding:20px 8px}
 
+  /* ---------- ラベル印刷（Brother QL 62mm） ---------- */
+  .lblPrev{
+    margin:8px 0 4px;padding:14px;background:var(--shell);border-radius:8px;
+    display:flex;justify-content:center;
+  }
+  .lab{
+    width:62mm;height:var(--lh,29mm);padding:1.5mm 2mm;box-sizing:border-box;
+    display:flex;gap:2mm;align-items:center;overflow:hidden;
+    background:#fff;color:#000;
+  }
+  .lblPrev .lab{box-shadow:0 0 0 1px var(--line)}
+  .lab svg{width:var(--lq,25mm);height:var(--lq,25mm);display:block;flex:0 0 auto}
+  .lab .noqr{
+    width:var(--lq,25mm);height:var(--lq,25mm);flex:0 0 auto;
+    border:1px dashed #999;border-radius:1mm;display:flex;align-items:center;justify-content:center;
+    font-size:8pt;color:#555;
+  }
+  .lab .t{min-width:0;line-height:1.25;font-family:var(--ja)}
+  .lab .id{font-family:var(--mono);font-size:14pt;font-weight:700;letter-spacing:.02em}
+  .lab .nm{font-size:11pt;font-weight:600;word-break:break-all}
+  .lab .rj{font-family:var(--mono);font-size:8.5pt;word-break:break-all}
+  .lab .db{font-family:var(--mono);font-size:8.5pt}
+  .lblRow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .lblRow .field{flex:1;min-width:140px}
+  .lblNote{font-size:12.5px;color:var(--dim);margin:6px 0 0;line-height:1.5}
+
   @page{size:A4 portrait;margin:10mm}
   @media print{
     html,body{height:auto;background:#fff}
@@ -302,6 +328,36 @@
     <div class="pgrid" id="pgrid"></div>
   </div>
 </div>
+
+<!-- label print (Brother QL 62mm) -->
+<div class="sheet hide" id="lblSheet"><div class="inner">
+  <h2>ラベルを印刷</h2>
+  <p class="sub">Brother QL の 62mm 長尺ロール用です。プリンターの用紙設定を下の「ラベルの長さ」と同じにしてください。</p>
+  <div class="lblPrev" id="lblPrev"></div>
+  <div class="lblRow">
+    <div class="field"><label>ラベルの長さ</label>
+      <select id="lblLen">
+        <option value="29">62mm × 29mm（QR 25mm）</option>
+        <option value="40">62mm × 40mm（QR 32mm）</option>
+        <option value="50">62mm × 50mm（QR 40mm）</option>
+      </select>
+    </div>
+    <div class="field"><label>枚数</label>
+      <select id="lblCount">
+        <option value="1">1枚</option>
+        <option value="2">2枚</option>
+        <option value="3">3枚</option>
+        <option value="4">4枚</option>
+        <option value="5">5枚</option>
+      </select>
+    </div>
+  </div>
+  <p class="lblNote">印刷画面では「Brother QL-820NWB」を選び、用紙サイズは「62mm × 29mm」など上と同じ長さ、余白は「なし」、倍率は「100%（既定）」にしてください。ヘッダーとフッターは外してください。</p>
+  <div class="actions">
+    <button class="btn" id="lblGo">印刷する</button>
+    <button class="btn ghost" id="lblClose">閉じる</button>
+  </div>
+</div></div>
 
 <!-- column mapping -->
 <div class="sheet hide" id="mapSheet"><div class="inner">
@@ -1159,6 +1215,10 @@ function renderStage(){
     stop.innerHTML = '<h2></h2><p>90で始まる6桁の番号は、QRを作らない決まりにしています。' +
       'この方はこれまでどおりの方法でVolusonに入力してください。</p>';
     stop.children[0].textContent = current.id + '　' + shownName(current);
+    var lb = document.createElement('button');
+    lb.type = 'button'; lb.className = 'btn ghost'; lb.textContent = 'ラベルを印刷（QRなし）';
+    lb.addEventListener('click', function(){ openLabel(current); });
+    stop.appendChild(lb);
     stage.appendChild(stop);
     return;
   }
@@ -1194,6 +1254,10 @@ function renderStage(){
   edit.type = 'button'; edit.textContent = 'ローマ字を直す';
   edit.addEventListener('click', function(){ editRomaji(current); });
   sizes.appendChild(edit);
+  var lbl = document.createElement('button');
+  lbl.type = 'button'; lbl.textContent = 'ラベルを印刷';
+  lbl.addEventListener('click', function(){ openLabel(current); });
+  sizes.appendChild(lbl);
   stage.appendChild(sizes);
 
   if(!current.dob || !realDate(current.dob)){
@@ -1633,15 +1697,111 @@ $('pBlocked').addEventListener('change', function(){
   renderPrint();
 });
 
+// ---------------------------------------------------------------- ラベル印刷（Brother QL 62mm 長尺）
+var lblLen   = load('lbllen', 29);
+var lblCount = load('lblcount', 1);
+var lblTarget = null;
+
+function lblQrMm(len){ return len >= 50 ? 40 : (len >= 40 ? 32 : 25); }
+
+// ラベル1枚ぶんのHTML（プレビューと印刷の両方で使う）
+function labelHtml(p){
+  var r = romaOf(p);
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var qrPart;
+  if(p.blocked){
+    qrPart = '<div class="noqr">QRなし</div>';
+  } else {
+    var qr = QR.encode(payload(p), { level: settings.level });
+    qrPart = QR.toSvg(qr, { scale: 4, quiet: 2 });
+  }
+  return '<div class="lab">' + qrPart +
+    '<div class="t">' +
+      '<div class="id">' + esc(p.id) + '</div>' +
+      '<div class="nm">' + esc(shownName(p)) + '</div>' +
+      '<div class="rj">' + esc(p.blocked ? '' : ((r.last || '') + (r.first ? ' ' + r.first : ''))) + '</div>' +
+      '<div class="db">' + esc(prettyDob(p.dob) || '生年月日なし') + '</div>' +
+    '</div></div>';
+}
+
+function renderLabelPreview(){
+  var pv = $('lblPrev');
+  pv.style.setProperty('--lh', lblLen + 'mm');
+  pv.style.setProperty('--lq', lblQrMm(lblLen) + 'mm');
+  pv.innerHTML = lblTarget ? labelHtml(lblTarget) : '';
+}
+
+function openLabel(p){
+  if(!p) return;
+  lblTarget = p;
+  $('lblLen').value = String(lblLen);
+  $('lblCount').value = String(lblCount);
+  renderLabelPreview();
+  $('lblSheet').classList.remove('hide');
+}
+
+// 別文書（iframe）に 62mm×長さ の @page を持たせて印刷する。本体のA4設定と干渉させないため。
+function printLabel(){
+  if(!lblTarget) return;
+  var one = labelHtml(lblTarget), body = '';
+  for(var i = 0; i < lblCount; i++) body += one;
+  var css =
+    '@page{size:62mm ' + lblLen + 'mm;margin:0}' +
+    'html,body{margin:0;padding:0;background:#fff}' +
+    'body{width:62mm}' +
+    '.lab{width:62mm;height:' + lblLen + 'mm;padding:1.5mm 2mm;box-sizing:border-box;' +
+      'display:flex;gap:2mm;align-items:center;overflow:hidden;color:#000;' +
+      'page-break-after:always;break-after:page}' +
+    '.lab:last-child{page-break-after:auto;break-after:auto}' +
+    '.lab svg{width:' + lblQrMm(lblLen) + 'mm;height:' + lblQrMm(lblLen) + 'mm;display:block;flex:0 0 auto}' +
+    '.lab .noqr{width:' + lblQrMm(lblLen) + 'mm;height:' + lblQrMm(lblLen) + 'mm;flex:0 0 auto;' +
+      'border:1px dashed #999;border-radius:1mm;display:flex;align-items:center;justify-content:center;font-size:8pt;color:#555}' +
+    '.lab .t{min-width:0;line-height:1.25;font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",YuGothic,Meiryo,sans-serif}' +
+    '.lab .id{font-family:Consolas,"Liberation Mono",Menlo,monospace;font-size:14pt;font-weight:700;letter-spacing:.02em}' +
+    '.lab .nm{font-size:11pt;font-weight:600;word-break:break-all}' +
+    '.lab .rj{font-family:Consolas,"Liberation Mono",Menlo,monospace;font-size:8.5pt;word-break:break-all}' +
+    '.lab .db{font-family:Consolas,"Liberation Mono",Menlo,monospace;font-size:8.5pt}';
+  var doc = '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>' + lblTarget.id +
+            '</title><style>' + css + '</style></head><body>' + body + '</body></html>';
+
+  var old = $('lblFrame');
+  if(old) old.parentNode.removeChild(old);
+  var f = document.createElement('iframe');
+  f.id = 'lblFrame';
+  f.setAttribute('aria-hidden', 'true');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  f.onload = function(){
+    try{
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    }catch(e){ alert('印刷画面を開けませんでした。ブラウザの設定を確認してください。'); }
+  };
+  document.body.appendChild(f);
+  f.srcdoc = doc;
+}
+
+$('lblGo').addEventListener('click', printLabel);
+$('lblClose').addEventListener('click', function(){ $('lblSheet').classList.add('hide'); });
+$('lblLen').addEventListener('change', function(){
+  lblLen = parseInt(this.value, 10) || 29;
+  save('lbllen', lblLen);
+  renderLabelPreview();
+});
+$('lblCount').addEventListener('change', function(){
+  lblCount = parseInt(this.value, 10) || 1;
+  save('lblcount', lblCount);
+});
+
 // ---------------------------------------------------------------- keys
 $('q').addEventListener('input', renderList);
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape'){
-    ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet'].forEach(function(id){ $(id).classList.add('hide'); });
+    ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet','lblSheet'].forEach(function(id){ $(id).classList.add('hide'); });
     closePrint();
     return;
   }
-  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet','printPane'].some(function(id){
+  var open = ['mapSheet','manSheet','scanSheet','setSheet','repSheet','syncSheet','lblSheet','printPane'].some(function(id){
     return !$(id).classList.contains('hide');
   });
   if(open) return;
